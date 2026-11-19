@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { ArrowUpRight, BellRing, Crosshair, Minus, Plus, Radar as RadarIcon, RotateCcw } from 'lucide-react';
 import regions from '../assets/ukraine-regions.json';
 import type { Preferences } from '../services/preferences';
+import { CivilAlertsPanel } from '../components/CivilAlertsPanel';
+import { useCivilAlerts } from '../hooks/useCivilAlerts';
 
 const regionsById = [...regions].sort((a, b) => a.name.localeCompare(b.name, 'uk'));
 const exerciseRegions = new Set(['UA-30', 'UA-32', 'UA-74']);
@@ -17,12 +19,18 @@ export function Radar({ preferences }: { preferences: Preferences }) {
   const [selected, selectRegion] = useState('UA-30');
   const [exercise, setExercise] = useState<'idle' | 'active' | 'ended'>('idle');
   const exerciseActive = exercise === 'active';
+  const feed = useCivilAlerts();
   const [zoom, setZoom] = useState(preferences.focus === 'kyiv' ? 2.4 : 1);
   const [paths] = useState(buildPaths);
   const canvas = useRef<HTMLCanvasElement>(null);
   const transform = useRef({ scale: 1, x: 0, y: 0 });
   const activeRegion = regions.find(region => region.id === selected);
   const inExercise = exerciseActive && exerciseRegions.has(selected);
+  const selectedAlert = feed.status === 'ready' ? feed.alerts.find(alert => alert.regionId === selected) : undefined;
+  const regionLabel = inExercise ? 'Демо-тривога' :
+    selectedAlert?.partial ? 'Тривога в частині області' :
+    selectedAlert?.active ? 'Повітряна тривога' :
+    selectedAlert ? 'Останнє повідомлення · відбій' : 'Стан невідомий';
 
   useEffect(() => {
     const element = canvas.current;
@@ -42,8 +50,13 @@ export function Radar({ preferences }: { preferences: Preferences }) {
       transform.current = { scale, x, y };
       context.setTransform(scale * density, 0, 0, scale * density, x * density, y * density);
 
+      const officialAlerts = feed.status === 'ready' ? feed.alerts : [];
+      const activeRegions = exerciseActive ? exerciseRegions : new Set(
+        officialAlerts.filter(alert => alert.active).map(alert => alert.regionId),
+      );
+
       for (const region of paths) {
-        const highlighted = exerciseActive && exerciseRegions.has(region.id);
+        const highlighted = activeRegions.has(region.id);
         context.fillStyle = highlighted ? '#532332' : '#192632';
         context.fill(region.shape, 'evenodd');
         context.lineWidth = 0.9 / scale;
@@ -63,7 +76,7 @@ export function Radar({ preferences }: { preferences: Preferences }) {
         context.textAlign = 'center';
         for (const region of paths) {
           if (region.id === 'UA-30' || region.id === 'UA-40') continue;
-          context.fillStyle = exerciseActive && exerciseRegions.has(region.id) ? '#ffb9bd' : '#aabcca';
+          context.fillStyle = activeRegions.has(region.id) ? '#ffb9bd' : '#aabcca';
           const labelOffset = region.id === 'UA-32' ? 31 : region.id === 'UA-61' ? 14 : 0;
           context.fillText(region.label, region.x, region.y + labelOffset);
         }
@@ -71,7 +84,7 @@ export function Radar({ preferences }: { preferences: Preferences }) {
 
       context.beginPath();
       context.arc(capital.x, capital.y, 11 / scale, 0, 2 * Math.PI);
-      context.fillStyle = exerciseActive ? '#ff5d67' : '#57788f';
+      context.fillStyle = activeRegions.has('UA-30') ? '#ff5d67' : '#57788f';
       context.fill();
       context.strokeStyle = '#fff3f3';
       context.lineWidth = 2 / scale;
@@ -89,7 +102,7 @@ export function Radar({ preferences }: { preferences: Preferences }) {
     resize.observe(element);
     draw();
     return () => resize.disconnect();
-  }, [exerciseActive, paths, preferences.labels, selected, zoom]);
+  }, [exerciseActive, feed, paths, preferences.labels, selected, zoom]);
 
   function pickRegion(event: MouseEvent<HTMLCanvasElement>) {
     const element = event.currentTarget;
@@ -113,8 +126,9 @@ export function Radar({ preferences }: { preferences: Preferences }) {
   }
 
   return <>
-    <div className="page-title"><h1>Радар</h1><p>Карта тривог України · навчальний сценарій.</p></div>
-    <div className="notice"><RadarIcon size={18} aria-hidden="true" /> <span><strong>DEMO MODE.</strong> Позначення на карті навчальні. Поточний стан тривог невідомий.</span></div>
+    <div className="page-title"><h1>Радар</h1><p>Офіційні повідомлення для Києва та Київської області.</p></div>
+    <CivilAlertsPanel feed={feed} />
+    {exerciseActive && <div className="notice"><RadarIcon size={18} aria-hidden="true" /> <span><strong>DEMO MODE.</strong> Карта відображає навчальний сценарій.</span></div>}
     <section className="panel exercise-panel" aria-labelledby="exercise-title">
       <div className="exercise-copy">
         <BellRing size={20} aria-hidden="true" />
@@ -149,8 +163,8 @@ export function Radar({ preferences }: { preferences: Preferences }) {
         </div>
         <canvas ref={canvas} onClick={pickRegion} aria-hidden="true" />
         <div className="map-footer">
-          <span><i className="legend-swatch" /> Демо-тривога</span>
-          <span><i className="legend-swatch neutral" /> Без демо-події</span>
+          <span><i className="legend-swatch" /> {exerciseActive ? 'Демо-тривога' : 'Останнє повідомлення · тривога'}</span>
+          <span><i className="legend-swatch neutral" /> {exerciseActive ? 'Без демо-події' : 'Без позначки тривоги'}</span>
           <a href="https://www.geoboundaries.org/" target="_blank" rel="noreferrer">geoBoundaries</a>
           <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
         </div>
@@ -163,9 +177,11 @@ export function Radar({ preferences }: { preferences: Preferences }) {
           </select>
         <div className="region-result" aria-live="polite">
           <h3>{activeRegion?.name}</h3>
-          <span className={inExercise ? 'tag active-alert' : 'tag'}>{inExercise ? 'Демо-тривога' : 'Без демо-події'}</span>
+          <span className={inExercise || (!exerciseActive && selectedAlert?.active) ? 'tag active-alert' : 'tag'}>
+            {exerciseActive && !inExercise ? 'Без демо-події' : regionLabel}
+          </span>
         </div>
-        <p className="muted">Позначки показують лише стан навчального сценарію.</p>
+
       </section>
     </div>
   </>;

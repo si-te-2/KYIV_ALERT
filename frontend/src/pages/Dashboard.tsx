@@ -73,14 +73,14 @@ export function Dashboard() {
               <div className="hero-copy">
                 <span className="demo-label"><span className="demo-pip" /> DEMO MODE</span>
                 <h1>Панель тривог<span>.</span></h1>
-                <p>Перегляньте карту України та перевірте стан моніторингу. На карті відображено навчальний сценарій.</p>
+                <p>Перегляньте карту України та перевірте стан моніторингу. На радарі доступний навчальний сценарій та окремий розділ офіційних повідомлень для Києва й області.</p>
                 <a className="primary-button" href="#/radar"><RadarIcon size={19} aria-hidden="true" /> Відкрити радар <ArrowUpRight size={17} aria-hidden="true" /></a>
               </div>
             </section>
 
             <div className="status-grid" aria-live="polite">
               <StatusCard label="Система" value={connected ? 'Демо доступне' : 'Стан невідомий'} detail={connected ? 'Локальний API відповідає' : 'Очікуємо відповідь локального API'} icon={<Activity size={18} />} />
-              <StatusCard label="Моніторинг" value={monitoringLabel(snapshot?.monitoringStatus, connected)} detail="Збір повідомлень вимкнено" icon={<Radio size={18} />} warning />
+              <StatusCard label="Моніторинг" value={monitoringLabel(snapshot?.monitoringStatus, connected)} detail="Статус демонстраційного аналізатора" icon={<Radio size={18} />} warning />
               <StatusCard label="Telegram" value={connected && snapshot?.telegramStatus === 'NOT_CONFIGURED' ? 'Очікує доступу' : 'Стан невідомий'} detail={`${telegram.length} каналів у списку джерел`} icon={<BellRing size={18} />} />
             </div>
 

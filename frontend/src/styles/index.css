@@ -126,3 +126,14 @@ select { width: 100%; color: #f4f5f8; background: #202b39; border: 1px solid #3a
   .hero, .page-title { animation: appear .24s ease-out; }
   @keyframes appear { from { opacity: .65; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 }
+
+.civil-alerts { margin-bottom: 15px; }
+.civil-header, .civil-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 9px; }
+.civil-header h2, .civil-footer a, .civil-source span { display: inline-flex; align-items: center; gap: 6px; }
+.civil-header h2 svg { color: #ff909a; }
+.civil-regions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 235px), 1fr)); gap: 10px; margin: 14px 0 12px; }
+.civil-region { min-width: 0; border: 1px solid #303a4a; background: #19222d; border-radius: 9px; padding: 12px; }
+.civil-region p { margin: 4px 0; font-size: .88rem; }
+.civil-source { display: flex; flex-wrap: wrap; gap: 4px 10px; width: fit-content; font-size: .78rem; }
+.civil-footer a, .civil-source span { text-decoration: underline; text-underline-offset: 3px; }
+.civil-footer a:hover, .civil-source:hover { color: #ff9ba2; }
