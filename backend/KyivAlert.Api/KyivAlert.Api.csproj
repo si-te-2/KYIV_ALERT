@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
+    <EmbeddedResource Include="Data/district-feed.json" />
     <ProjectReference Include="../KyivAlert.Core/KyivAlert.Core.csproj" />
     <ProjectReference Include="../KyivAlert.Infrastructure/KyivAlert.Infrastructure.csproj" />
     <ProjectReference Include="../KyivAlert.Telegram/KyivAlert.Telegram.csproj" />

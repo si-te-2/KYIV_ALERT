@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 
-export type AlertLevel = 'active' | 'warning' | 'partial' | 'ended' | 'none';
+export type AlertLevel = 'active' | 'warning' | 'partial' | 'ended' | 'clear' | 'none';
 
 export interface RegionalAlert {
   regionId: string;
   level: AlertLevel;
   publishedAt: string | null;
+  inherited?: boolean;
 }
 
 export interface Feed {
@@ -18,8 +19,9 @@ export const alertLabels: Record<AlertLevel, string> = {
   active: 'Повітряна тривога',
   warning: 'Попередження про загрозу',
   partial: 'Тривога в частині області',
-  ended: 'Останнє повідомлення · відбій',
-  none: 'Немає активного повідомлення',
+  ended: 'Тривоги немає',
+  clear: 'Тривоги немає',
+  none: 'Немає даних',
 };
 
 export function isActive(level?: AlertLevel) {
@@ -57,4 +59,8 @@ export function useCivilAlerts() {
   }, []);
 
   return feed;
+}
+
+export function statusLabel(level?: AlertLevel) {
+  return isActive(level) ? 'Тривога є' : level === 'clear' || level === 'ended' ? 'Тривоги немає' : 'Немає даних';
 }

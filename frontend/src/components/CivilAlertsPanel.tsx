@@ -1,5 +1,5 @@
 import { Bell, Radio } from 'lucide-react';
-import { alertLabels, isActive, type Feed } from '../hooks/useCivilAlerts';
+import { alertLabels, isActive, statusLabel, type Feed } from '../hooks/useCivilAlerts';
 import type { Location } from '../services/locations';
 
 const dateFormat = new Intl.DateTimeFormat('uk-UA', {
@@ -19,7 +19,8 @@ export function CivilAlertsPanel({ feed, location, notifications, enableNotifica
     <div className="section-icon"><Radio size={20} aria-hidden="true" /></div>
     <div className="regional-summary" aria-live="polite">
       <p className="eyebrow">{location.name}</p>
-      <h2>{region ? alertLabels[region.level] : 'Стан невідомий'}</h2>
+      <h2>{statusLabel(region?.level)}</h2>
+      {active && region && <p className="regional-level">{region.level === 'partial' && /^UA\d/.test(location.regionId) ? 'Тривога в частині району' : alertLabels[region.level]}{region.inherited ? ' · оголошено для всієї області' : ''}</p>}
       <p>{region?.publishedAt ? `Оголошення · ${dateFormat.format(new Date(region.publishedAt))}` :
         feed.checkedAt && region ? `Перевірено · ${dateFormat.format(new Date(feed.checkedAt))}` :
         feed.status === 'connecting' ? 'Оновлюємо дані…' : 'Актуальні дані для цього регіону недоступні.'}</p>

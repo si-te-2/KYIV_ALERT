@@ -3,7 +3,7 @@ using KyivAlert.Telegram;
 
 namespace KyivAlert.Api;
 
-public sealed record RegionalAlert(string RegionId, string Level, DateTimeOffset? PublishedAt);
+public sealed record RegionalAlert(string RegionId, string Level, DateTimeOffset? PublishedAt, bool Inherited = false);
 
 public sealed record RegionalAlertsSnapshot(string Status, DateTimeOffset? CheckedAt, IReadOnlyList<RegionalAlert> Alerts);
 
@@ -30,7 +30,7 @@ public sealed class RegionalAlerts(
     public RegionalAlertsSnapshot Read()
     {
         var latest = Volatile.Read(ref national);
-        if (latest?.CheckedAt is { } checkedAt && clock.GetUtcNow() - checkedAt < RetryInterval)
+        if (latest?.CheckedAt is { } checkedAt && clock.GetUtcNow() - checkedAt < TimeSpan.FromMinutes(3))
             return latest;
 
         var local = civilAlerts.GetSnapshot();
@@ -59,7 +59,8 @@ public sealed class RegionalAlerts(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var token = configuration["CivilAlerts:NationalApiToken"]?.Trim();
-        if (string.IsNullOrEmpty(token)) return;
+        var usePublicFeed = configuration.GetValue("CivilAlerts:PublicFeed", false);
+        if (string.IsNullOrEmpty(token) && !usePublicFeed) return;
 
         using var client = clients.CreateClient("regional-alerts");
         while (!stoppingToken.IsCancellationRequested)
@@ -67,13 +68,21 @@ public sealed class RegionalAlerts(
             var delay = PollInterval;
             try
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get,
-                    "https://api.alerts.in.ua/v2/iot/active_air_raid_alerts_by_oblast.json");
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                using var response = await client.SendAsync(request, stoppingToken);
-                response.EnsureSuccessStatusCode();
-                var codes = await response.Content.ReadFromJsonAsync<string>(cancellationToken: stoppingToken);
-                Volatile.Write(ref national, new RegionalAlertsSnapshot("ready", clock.GetUtcNow(), ParseNational(codes)));
+                if (usePublicFeed)
+                {
+                    var result = await PublicDistrictFeed.ReadAsync(client, clock.GetUtcNow(), stoppingToken);
+                    Volatile.Write(ref national, result);
+                }
+                else
+                {
+                    using var request = new HttpRequestMessage(HttpMethod.Get,
+                        "https://api.alerts.in.ua/v2/iot/active_air_raid_alerts_by_oblast.json");
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                    using var response = await client.SendAsync(request, stoppingToken);
+                    response.EnsureSuccessStatusCode();
+                    var codes = await response.Content.ReadFromJsonAsync<string>(cancellationToken: stoppingToken);
+                    Volatile.Write(ref national, new RegionalAlertsSnapshot("ready", clock.GetUtcNow(), ParseNational(codes)));
+                }
             }
             catch (Exception error) when (!stoppingToken.IsCancellationRequested)
             {

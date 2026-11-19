@@ -228,3 +228,33 @@ select { width: 100%; border: 1px solid #51466b; border-radius: 9px; background:
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; }
 }
+
+.segmented { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.map-heading { flex-wrap: wrap; }
+.map-shortcuts { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 15px 12px; }
+.map-shortcuts button, .inbox-button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #51466e; border-radius: 8px; padding: 6px 9px; background: #25213a; color: #ede4fe; font-size: .8rem; }
+.map-shortcuts button:hover, .inbox-button:hover { background: #40365f; }
+.map-shortcuts button[aria-pressed="true"] { background: #41355d; border-color: #866ca6; }
+.map-surface canvas { touch-action: none; cursor: grab; }
+.map-surface canvas:active { cursor: grabbing; }
+.regional-level { color: #ffc3dd; font-size: .85rem; }
+.message-dialog { width: min(420px, calc(100% - 30px)); margin: auto; color: var(--text); }
+.message-dialog::backdrop { background: #070915ac; backdrop-filter: blur(4px); }
+.dialog-title, .dialog-title h2, .site-footer > a { display: flex; align-items: center; gap: 9px; }
+.dialog-title { justify-content: space-between; }
+.dialog-title button { border-radius: 8px; padding: 6px; }
+.dialog-title button:hover { background: #30274a; }
+.dialog-note, .inbox-entry { margin: 13px 0; font-size: .87rem; }
+.inbox-entry { display: grid; gap: 5px; background: #22213a; border: 1px solid #51466e; border-radius: 10px; padding: 12px; }
+.inbox-entry.inbox-active { border-color: #b36a91; }
+.inbox-entry time { color: var(--muted); font-size: .77rem; }
+.dialog-link, .site-footer a { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 600px) {
+  .header-actions { flex-wrap: wrap; justify-content: flex-end; gap: 5px 7px; }
+  .inbox-button { padding: 5px 6px; font-size: .71rem; }
+  .inbox-button svg { width: 15px; }
+  .location-chip { max-width: 155px; padding: 5px 7px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .message-dialog[open] { animation: enter .25s ease-out both; }
+}

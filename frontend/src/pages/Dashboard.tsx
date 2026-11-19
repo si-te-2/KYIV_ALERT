@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, BellRing, ChevronDown, MapPin, Radar as RadarIcon, Waves } from 'lucide-react';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, BellRing, ChevronDown, MapPin, MessageSquareText, X, Radar as RadarIcon, Waves } from 'lucide-react';
 import { CivilAlertsPanel } from '../components/CivilAlertsPanel';
-import { alertLabels, isActive, useCivilAlerts, type AlertLevel } from '../hooks/useCivilAlerts';
-import { cityOptions, findLocation, oblastOptions, type Location } from '../services/locations';
+import { alertLabels, isActive, statusLabel, useCivilAlerts, type AlertLevel } from '../hooks/useCivilAlerts';
+import { cityOptions, districtOptions, findLocation, mapAreas, mapDistricts, oblastOptions, type Location } from '../services/locations';
 import { Radar } from './Radar';
 
 const locationKey = 'kyiv-alert-location';
@@ -30,7 +30,8 @@ function useRegionalNotifications(regionId: string | undefined, name: string | u
     if (last?.regionId !== regionId || last.level === level || !isActive(level) || permission !== 'granted') return;
 
     try {
-      new Notification(alertLabels[level], { body: name, tag: `kyiv-alert-${regionId}` });
+      const title = level === 'partial' && /^UA\d/.test(regionId) ? 'Тривога в частині району' : alertLabels[level];
+      new Notification(title, { body: name, tag: `kyiv-alert-${regionId}` });
     } catch {
       setPermission('unsupported');
     }
@@ -53,13 +54,15 @@ function RegionForm({ location, onSave, onCancel }: {
   onSave: (location: Location) => void;
   onCancel?: () => void;
 }) {
-  const initialKind = cityOptions.some(item => item.id === location?.id) ? 'city' : 'oblast';
-  const [kind, setKind] = useState<'city' | 'oblast'>(initialKind);
+  const initialKind = cityOptions.some(item => item.id === location?.id) ? 'city' : districtOptions.some(item => item.id === location?.id) ? 'district' : 'oblast';
+  const [kind, setKind] = useState<'city' | 'oblast' | 'district'>(initialKind);
   const [selected, setSelected] = useState(location?.id ?? '');
-  const options = kind === 'oblast' ? oblastOptions : cityOptions;
+  const options = kind === 'oblast' ? oblastOptions : kind === 'district' ? districtOptions : cityOptions;
+  const kindLabel = { oblast: 'Область', city: 'Місто', district: 'Район' }[kind];
+  const emptyLabel = { oblast: 'Виберіть область', city: 'Виберіть місто', district: 'Виберіть район' }[kind];
   const picked = options.find(item => item.id === selected);
   const mappedOblast = picked && picked.id !== picked.regionId
-    ? oblastOptions.find(item => item.id === picked.regionId)
+    ? mapAreas.find(item => item.id === picked.regionId)
     : undefined;
 
   return <form className="location-form panel" onSubmit={event => {
@@ -73,13 +76,21 @@ function RegionForm({ location, onSave, onCancel }: {
     <div className="segmented" role="group" aria-label="Тип регіону">
       <button type="button" aria-pressed={kind === 'oblast'} onClick={() => { setKind('oblast'); setSelected(''); }}>Область</button>
       <button type="button" aria-pressed={kind === 'city'} onClick={() => { setKind('city'); setSelected(''); }}>Місто</button>
+      <button type="button" aria-pressed={kind === 'district'} onClick={() => { setKind('district'); setSelected(''); }}>Район</button>
     </div>
-    <label className="location-label" htmlFor="location-select">{kind === 'oblast' ? 'Область' : 'Місто'}</label>
+    <label className="location-label" htmlFor="location-select">{kindLabel}</label>
     <select id="location-select" value={selected} onChange={event => setSelected(event.target.value)} required>
-      <option value="" disabled>{kind === 'oblast' ? 'Виберіть область' : 'Виберіть місто'}</option>
-      {options.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+      <option value="" disabled>{emptyLabel}</option>
+      {kind !== 'district'
+        ? options.map(item => <option key={item.id} value={item.id}>{item.name}</option>)
+        : oblastOptions.map(oblast => {
+          const children = mapDistricts.filter(area => area.parentId === oblast.id);
+          return children.length > 0 && <optgroup key={oblast.id} label={oblast.name}>
+            {children.map(area => <option key={area.id} value={area.id}>{area.name}</option>)}
+          </optgroup>;
+        })}
     </select>
-    {mappedOblast && <p className="location-note">Сповіщення для міста надходитимуть за областю · {mappedOblast.name}.</p>}
+    {mappedOblast && <p className="location-note">Територія для сповіщень · {mappedOblast.name}.</p>}
     <button className="primary-button" type="submit" disabled={!picked}>
       {location ? 'Зберегти регіон' : 'Відкрити радар'} <ArrowRight size={19} aria-hidden="true" />
     </button>
@@ -92,6 +103,7 @@ export function Dashboard() {
   const [editing, setEditing] = useState(false);
   const radar = useRef<HTMLElement>(null);
   const locationPicker = useRef<HTMLDivElement>(null);
+  const messages = useRef<HTMLDialogElement>(null);
   const feed = useCivilAlerts();
   const region = feed.alerts.find(item => item.regionId === location?.regionId);
   const notifications = useRegionalNotifications(location?.regionId, location?.name, region?.level);
@@ -125,12 +137,33 @@ export function Dashboard() {
           <a className="national-link" href="https://map.ukrainealarm.com/" target="_blank" rel="noreferrer">
             Офіційна мапа <ArrowUpRight size={15} aria-hidden="true" />
           </a>
+          <button type="button" className="inbox-button" onClick={() => messages.current?.showModal()}>
+            <MessageSquareText size={17} aria-hidden="true" /> <span>Повідомлення</span>
+          </button>
           {location && <button type="button" className="location-chip" onClick={changeLocation} aria-expanded={editing}>
             <MapPin size={16} aria-hidden="true" /> <span>{location.name}</span> <ChevronDown size={15} aria-hidden="true" />
           </button>}
         </div>
       </div>
     </header>
+    <dialog ref={messages} className="panel message-dialog" aria-labelledby="messages-title">
+      <div className="dialog-title">
+        <h2 id="messages-title"><MessageSquareText size={21} aria-hidden="true" /> Повідомлення</h2>
+        <form method="dialog"><button type="submit" aria-label="Закрити повідомлення"><X size={21} aria-hidden="true" /></button></form>
+      </div>
+      {location ? <article className={'inbox-entry' + (isActive(region?.level) ? ' inbox-active' : '')}>
+        <p>{location.name}</p>
+        <strong>{statusLabel(region?.level)}</strong>
+        {region?.publishedAt && <time dateTime={region.publishedAt}>
+          {new Intl.DateTimeFormat('uk-UA', {
+            timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short',
+          }).format(new Date(region.publishedAt))}
+        </time>}
+      </article> : <p className="dialog-note">Виберіть територію, щоб тут з’явилися її сповіщення.</p>}
+      <a className="national-link dialog-link" href="https://map.ukrainealarm.com/" target="_blank" rel="noreferrer">
+        Офіційна мапа повітряних тривог <ArrowUpRight size={15} aria-hidden="true" />
+      </a>
+    </dialog>
     <main className="site-main" id="main">
       <section className={'hero' + (choosing ? ' hero-onboarding' : '')}>
         <div className="hero-photo" aria-hidden="true" />
@@ -151,6 +184,10 @@ export function Dashboard() {
         <Radar feed={feed} location={location} />
       </section>}
     </main>
-    <footer className="site-footer"><span>KYIV ALERT</span><span><BellRing size={15} aria-hidden="true" /> Повітряні тривоги України</span></footer>
+    <footer className="site-footer">
+      <span>KYIV ALERT</span>
+      <a href="https://map.ukrainealarm.com/" target="_blank" rel="noreferrer">Офіційна мапа <ArrowUpRight size={14} aria-hidden="true" /></a>
+      <span><BellRing size={15} aria-hidden="true" /> Інформаційні дані · <a href="https://tryvoha.online/api" target="_blank" rel="noreferrer">Tryvoha.online</a></span>
+    </footer>
   </>;
 }
