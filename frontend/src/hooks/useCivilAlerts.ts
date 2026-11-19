@@ -1,23 +1,33 @@
 import { useEffect, useState } from 'react';
 
-export interface CivilAlert {
+export type AlertLevel = 'active' | 'warning' | 'partial' | 'ended' | 'none';
+
+export interface RegionalAlert {
   regionId: string;
-  active: boolean;
-  partial: boolean;
-  publishedAt: string;
-  sourceUrl: string;
+  level: AlertLevel;
+  publishedAt: string | null;
 }
 
-interface CivilAlertsSnapshot {
-  status: 'connecting' | 'disabled' | 'ready' | 'unavailable';
+export interface Feed {
+  status: 'connecting' | 'disabled' | 'limited' | 'ready' | 'unavailable';
   checkedAt: string | null;
-  alerts: CivilAlert[];
+  alerts: RegionalAlert[];
+}
+
+export const alertLabels: Record<AlertLevel, string> = {
+  active: 'Повітряна тривога',
+  warning: 'Попередження про загрозу',
+  partial: 'Тривога в частині області',
+  ended: 'Останнє повідомлення · відбій',
+  none: 'Немає активного повідомлення',
+};
+
+export function isActive(level?: AlertLevel) {
+  return level === 'active' || level === 'partial' || level === 'warning';
 }
 
 export function useCivilAlerts() {
-  const [snapshot, setSnapshot] = useState<CivilAlertsSnapshot>({
-    status: 'connecting', checkedAt: null, alerts: [],
-  });
+  const [feed, setFeed] = useState<Feed>({ status: 'connecting', checkedAt: null, alerts: [] });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -29,13 +39,11 @@ export function useCivilAlerts() {
           cache: 'no-store',
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),
         });
-        if (!response.ok) throw new Error('Civil alert feed unavailable.');
-        const next = await response.json() as CivilAlertsSnapshot;
-        if (!controller.signal.aborted) setSnapshot(next);
+        if (!response.ok) throw new Error('Regional alerts unavailable.');
+        const next = await response.json() as Feed;
+        if (!controller.signal.aborted) setFeed(next);
       } catch {
-        if (!controller.signal.aborted) {
-          setSnapshot({ status: 'unavailable', checkedAt: null, alerts: [] });
-        }
+        if (!controller.signal.aborted) setFeed({ status: 'unavailable', checkedAt: null, alerts: [] });
       } finally {
         if (!controller.signal.aborted) timer = setTimeout(refresh, 10000);
       }
@@ -48,5 +56,5 @@ export function useCivilAlerts() {
     };
   }, []);
 
-  return snapshot;
+  return feed;
 }
