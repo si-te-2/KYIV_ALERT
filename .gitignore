@@ -17,3 +17,4 @@ backend/KyivAlert.Api/wwwroot/
 .vs/
 .idea/
 TestResults/
+*.tsbuildinfo
