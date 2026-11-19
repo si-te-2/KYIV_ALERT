@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../KyivAlert.Core/KyivAlert.Core.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,35 @@
+@import 'tailwindcss';
+
+:root { font-family: Inter, 'Segoe UI', sans-serif; color: #f2f3f5; background: #101114; font-synthesis: none; color-scheme: dark; }
+body { margin: 0; min-width: 320px; }
+* { box-sizing: border-box; }
+h1, h2, p { margin: 0; }
+h1 { font-size: 24px; font-weight: 800; letter-spacing: .05em; }
+h2 { font-size: 20px; font-weight: 600; }
+.brand { display: flex; gap: 14px; align-items: center; }
+.brand-mark { display: grid; place-items: center; width: 48px; height: 48px; background: #e33c44; color: #fff; border-radius: 12px; font-size: 30px; font-weight: 900; }
+.eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #a2a6ae; }
+.brand .eyebrow { margin-top: 4px; }
+.connection { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #b3b7bf; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #da8c42; }
+.dot.online { background: #69b79a; }
+.demo-banner { margin: 40px 0 24px; padding: 30px; border: 1px solid #613037; border-radius: 16px; background: linear-gradient(120deg, #301b22, #1a171d); }
+.demo-banner .eyebrow { color: #ff8d94; font-weight: 700; }
+.demo-banner h2 { font-size: clamp(24px, 4vw, 36px); margin: 8px 0; }
+.demo-banner p:last-child { color: #c4afb4; line-height: 1.6; }
+.demo-symbol { color: #db4755; font-size: 64px; }
+.status-card, .panel { background: #191b20; border: 1px solid #2a2d34; border-radius: 14px; padding: 24px; }
+.status-card h2 { margin: 13px 0 8px; }
+.muted { color: #9399a5; font-size: 13px; line-height: 1.7; }
+.warning { color: #ff858b; }
+.panel > h2 { margin-bottom: 5px; }
+.source { margin-top: 24px; border-top: 1px solid #2e3139; padding-top: 20px; display: flex; align-items: center; gap: 15px; font-size: 14px; }
+.tag { display: inline-block; font-size: 10px; letter-spacing: .07em; color: #d0b8bc; background: #32252b; border: 1px solid #52353e; padding: 4px 8px; border-radius: 5px; }
+.message { margin-top: 24px; border-top: 1px solid #2e3139; padding-top: 20px; }
+.message p { font-size: 15px; line-height: 1.7; margin: 14px 0; }
+.message time, .message small { color: #9399a5; font-size: 12px; }
+.message a { color: #ff979e; display: block; margin-top: 10px; }
+.empty { margin: 24px 0 4px; font-size: 14px; color: #9399a5; }
+.error { padding: 18px; margin-top: 20px; color: #ff979e; border: 1px solid #613037; border-radius: 10px; }
+footer { color: #737987; font-size: 11px; margin-top: 28px; }
+@media (prefers-reduced-motion: no-preference) { main { animation: appear .35s ease-out; } @keyframes appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } } }
