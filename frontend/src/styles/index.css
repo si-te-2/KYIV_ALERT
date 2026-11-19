@@ -69,6 +69,14 @@ h3 { font-size: 1rem; font-weight: 700; }
 .notice svg { flex-shrink: 0; }
 .page-title { margin-bottom: 20px; }
 .page-title h1 { font-size: clamp(2.05rem, 4vw, 3.45rem); }
+.exercise-panel { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 20px; padding: 15px 18px; margin-bottom: 15px; }
+.exercise-copy { display: flex; align-items: flex-start; gap: 10px; }
+.exercise-copy > svg { color: #ff909a; flex-shrink: 0; margin-top: 3px; }
+.exercise-copy p { margin-top: 4px; font-size: .85rem; }
+.exercise-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.exercise-actions .primary-button { margin: 0; cursor: pointer; }
+.official-map { display: inline-flex; align-items: center; gap: 4px; text-decoration: underline; text-underline-offset: 3px; color: #d4deeb; font-size: .83rem; }
+.official-map:hover { color: #ff9ba2; }
 .radar-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(205px, 1fr); gap: 15px; align-items: start; }
 .map-panel { padding: 0; overflow: hidden; }
 .map-heading, .map-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 9px; align-items: center; padding: 13px 15px; }
