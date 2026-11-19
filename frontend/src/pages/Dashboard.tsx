@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, BellRing, ChevronDown, MapPin, MessageSquareText, X, Radar as RadarIcon, Waves } from 'lucide-react';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, BellRing, ChevronDown, MapPin, MessageSquareText, PanelRightOpen, X, Radar as RadarIcon, Waves } from 'lucide-react';
 import { CivilAlertsPanel } from '../components/CivilAlertsPanel';
 import { alertLabels, isActive, statusLabel, useCivilAlerts, type AlertLevel } from '../hooks/useCivilAlerts';
 import { cityOptions, districtOptions, findLocation, mapAreas, mapDistricts, oblastOptions, type Location } from '../services/locations';
@@ -101,6 +101,7 @@ function RegionForm({ location, onSave, onCancel }: {
 export function Dashboard() {
   const [location, setLocation] = useState(readLocation);
   const [editing, setEditing] = useState(false);
+  const [feedOpen, setFeedOpen] = useState(false);
   const radar = useRef<HTMLElement>(null);
   const locationPicker = useRef<HTMLDivElement>(null);
   const messages = useRef<HTMLDialogElement>(null);
@@ -140,6 +141,10 @@ export function Dashboard() {
           <button type="button" className="inbox-button" onClick={() => messages.current?.showModal()}>
             <MessageSquareText size={17} aria-hidden="true" /> <span>Повідомлення</span>
           </button>
+          {location && !editing && <button type="button" className="inbox-button header-feed"
+            onClick={() => setFeedOpen(true)} aria-haspopup="dialog">
+            <PanelRightOpen size={17} aria-hidden="true" /> <span>Стрічка тривог</span>
+          </button>}
           {location && <button type="button" className="location-chip" onClick={changeLocation} aria-expanded={editing}>
             <MapPin size={16} aria-hidden="true" /> <span>{location.name}</span> <ChevronDown size={15} aria-hidden="true" />
           </button>}
@@ -181,7 +186,7 @@ export function Dashboard() {
 
       {location && !editing && <section id="radar" ref={radar} tabIndex={-1} className="radar-section">
         <CivilAlertsPanel feed={feed} location={location} notifications={notifications.permission} enableNotifications={notifications.enable} />
-        <Radar feed={feed} location={location} />
+        <Radar feed={feed} location={location} feedOpen={feedOpen} onFeedOpenChange={setFeedOpen} />
       </section>}
     </main>
     <footer className="site-footer">

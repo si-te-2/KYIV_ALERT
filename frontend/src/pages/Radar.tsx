@@ -1,8 +1,20 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
-import { Crosshair, Layers, Minus, Plus, RotateCcw, RotateCw, Scan, Waves } from 'lucide-react';
-import { isActive, statusLabel, type AlertLevel, type Feed } from '../hooks/useCivilAlerts';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { Crosshair, Layers, Minus, Plus, PanelRightOpen, Radio, RotateCcw, RotateCw, Scan, Waves } from 'lucide-react';
+import { AlertFeedDrawer } from '../components/AlertFeedDrawer';
+import { alertLabels, isActive, statusLabel, type AlertLevel, type Feed } from '../hooks/useCivilAlerts';
 import { mapAreas, mapDistricts, mapRegions, type Location } from '../services/locations';
 import { countryView, getScale, keepPoint, toMap, toScreen, type Point } from '../services/mapCamera';
+
+const mapTime = new Intl.DateTimeFormat('uk-UA', {
+  timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short',
+});
+
+const mapKeys: Record<string, Point> = {
+  ArrowLeft: { x: 48, y: 0 },
+  ArrowRight: { x: -48, y: 0 },
+  ArrowUp: { x: 0, y: 48 },
+  ArrowDown: { x: 0, y: -48 },
+};
 
 const colors = {
   neutral: { fill: '#1b2440', border: '#4b5a83' },
@@ -16,13 +28,20 @@ const midpoint = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) /
 const distance = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y);
 const angleBetween = (a: Point, b: Point) => Math.atan2(b.y - a.y, b.x - a.x);
 
-export function Radar({ feed, location }: { feed: Feed; location: Location }) {
+export function Radar({ feed, location, feedOpen, onFeedOpenChange }: {
+  feed: Feed;
+  location: Location;
+  feedOpen: boolean;
+  onFeedOpenChange: (open: boolean) => void;
+}) {
   const [selected, selectRegion] = useState(location.regionId);
   const [exercise, setExercise] = useState<'idle' | 'active' | 'ended'>('idle');
   const [camera, setCamera] = useState(countryView);
   const [districts, setDistricts] = useState(true);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const canvas = useRef<HTMLCanvasElement>(null);
+  const mapPanel = useRef<HTMLElement>(null);
+  const mapSurface = useRef<HTMLDivElement>(null);
   const pointers = useRef(new Map<number, Point>());
   const dragged = useRef(false);
   const lastCamera = useRef(camera);
@@ -30,6 +49,10 @@ export function Radar({ feed, location }: { feed: Feed; location: Location }) {
   const inExercise = exercise === 'active';
   const activeArea = findArea(selected);
   const levels = useMemo(() => new Map(feed.alerts.map(alert => [alert.regionId, alert])), [feed.alerts]);
+
+  const selectedAlert = levels.get(selected);
+  const selectedLevel = getLevel(selected);
+  const eventTime = inExercise ? null : selectedAlert?.publishedAt ?? (selectedAlert ? feed.checkedAt : null);
 
   function getLevel(id: string): AlertLevel | undefined {
     return inExercise ? (id === location.regionId ? 'active' : undefined) : levels.get(id)?.level;
@@ -49,24 +72,32 @@ export function Radar({ feed, location }: { feed: Feed; location: Location }) {
     const element = canvas.current;
     if (!element) return;
     function wheel(event: WheelEvent) {
+      if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
       const bounds = element!.getBoundingClientRect();
       if (!bounds.width) return;
       const point = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
       setCamera(current => keepPoint(current, bounds, point, point, current.zoom * Math.exp(-event.deltaY * .0015)));
     }
-    element.addEventListener('wheel', wheel, { passive: false });
-    return () => element.removeEventListener('wheel', wheel);
+    const surface = mapSurface.current;
+    surface?.addEventListener('wheel', wheel, { passive: false });
+    return () => surface?.removeEventListener('wheel', wheel);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = canvas.current;
     const context = element?.getContext('2d');
     if (!element || !context || !size.width || !size.height) return;
     lastCamera.current = camera;
-    const density = window.devicePixelRatio || 1;
-    element.width = Math.round(size.width * density);
-    element.height = Math.round(size.height * density);
+    const density = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(size.width * density);
+    const height = Math.round(size.height * density);
+    if (element.width !== width || element.height !== height) {
+      element.width = width;
+      element.height = height;
+    }
+    context.resetTransform();
+    context.clearRect(0, 0, width, height);
     const scale = getScale(size, camera.zoom);
     context.setTransform(density, 0, 0, density, 0, 0);
     context.translate(size.width / 2, size.height / 2);
@@ -126,11 +157,28 @@ export function Radar({ feed, location }: { feed: Feed; location: Location }) {
 
   function focusArea(id: string) {
     const area = findArea(id);
-    if (!area || !size.width) return;
+    if (!area) return;
+    selectRegion(id);
+    if (!size.width) return;
     const [left, top, right, bottom] = area.bounds;
     const zoom = Math.min(6, Math.min(size.width / (right - left + 24), size.height / (bottom - top + 24)) / getScale(size, 1));
-    selectRegion(id);
     setCamera({ x: (left + right) / 2, y: (top + bottom) / 2, zoom, angle: 0 });
+  }
+
+  function chooseFromFeed(id: string) {
+    setExercise('idle');
+    setDistricts(true);
+    focusArea(id);
+    onFeedOpenChange(false);
+    requestAnimationFrame(() => mapPanel.current?.focus());
+  }
+
+  function panFromKeyboard(event: KeyboardEvent<HTMLCanvasElement>) {
+    const delta = mapKeys[event.key];
+    if (!delta || !size.width || event.altKey || event.ctrlKey || event.metaKey) return;
+    event.preventDefault();
+    const center = { x: size.width / 2, y: size.height / 2 };
+    setCamera(current => keepPoint(current, size, center, { x: center.x + delta.x, y: center.y + delta.y }));
   }
 
   function localPoint(event: PointerEvent<HTMLCanvasElement>) {
@@ -179,11 +227,12 @@ export function Radar({ feed, location }: { feed: Feed; location: Location }) {
     if (!isActive(level) || levels.get(area.id)?.inherited && !inExercise || (districts && level === 'partial' && mapRegions.some(region => region.id === area.id))) return [];
     const point = toScreen(camera, size, area);
     return point.x > 8 && point.y > 8 && point.x < size.width - 8 && point.y < size.height - 8
-      ? [{ id: area.id, level, left: point.x, top: point.y }] : [];
+      ? [{ id: area.id, name: area.name, level, left: point.x, top: point.y }] : [];
   }) : [];
 
   return <div className="radar-layout">
-    <section className="panel map-panel" aria-label="Карта України">
+    <AlertFeedDrawer feed={feed} open={feedOpen} onOpenChange={onFeedOpenChange} onSelect={chooseFromFeed} />
+    <section ref={mapPanel} tabIndex={-1} className="panel map-panel" aria-label="Карта України">
       <div className="map-heading">
         <div><p className="eyebrow"><Waves size={16} aria-hidden="true" /> Огляд</p><h2>Карта України</h2></div>
         <div className="map-controls">
@@ -199,14 +248,33 @@ export function Radar({ feed, location }: { feed: Feed; location: Location }) {
         <button type="button" className="map-toggle" aria-pressed={districts} onClick={() => setDistricts(value => !value)}><Layers size={16} /> Райони</button>
         <button type="button" onClick={() => focusArea('UA-51')}>Одещина</button>
         <button type="button" onClick={() => focusArea('UA-65')}>Херсонщина</button>
+        <button type="button" className="map-feed-button" onClick={() => onFeedOpenChange(true)} aria-haspopup="dialog">
+          <PanelRightOpen size={16} aria-hidden="true" /> Стрічка тривог
+        </button>
       </div>
-      <div className="map-surface">
+      <div className="map-surface" ref={mapSurface}>
         <canvas ref={canvas} onPointerDown={startDrag} onPointerMove={drag}
-          onPointerCancel={finishDrag} onPointerUp={finishDrag} aria-hidden="true" />
-        {mapMarkers.map(marker => <span key={marker.id} className={`map-pulse ${marker.level}`}
-          style={{ left: marker.left, top: marker.top }} aria-hidden="true" />)}
+          onPointerCancel={finishDrag} onPointerUp={finishDrag} onLostPointerCapture={finishDrag} onKeyDown={panFromKeyboard}
+          tabIndex={0} aria-label="Інтерактивна карта" aria-describedby="map-navigation-hint" />
+        {mapMarkers.map(marker => <button key={marker.id} type="button" className={`map-pulse ${marker.level}`}
+          style={{ left: marker.left, top: marker.top }} aria-label={`Оголошення: ${marker.name}`}
+          aria-pressed={selected === marker.id} onClick={() => selectRegion(marker.id)} />)}
         {inExercise && <span className="map-demo">НАВЧАЛЬНИЙ РЕЖИМ</span>}
       </div>
+      <div className="map-selection" aria-live="polite">
+        <div className="map-selection-icon"><Radio size={19} aria-hidden="true" /></div>
+        <div>
+          <h3>{activeArea?.name}</h3>
+          <p>{inExercise ? (selectedLevel ? 'Тестова тривога' : 'Без тестової події') : statusLabel(selectedLevel)}
+            {!inExercise && selectedLevel && isActive(selectedLevel) && selectedLevel !== 'active'
+              ? ` · ${selectedLevel === 'partial' && /^UA\d/.test(selected) ? 'Часткова тривога в районі' : alertLabels[selectedLevel]}`
+              : ''}</p>
+        </div>
+        {eventTime && <time dateTime={eventTime}>
+          {selectedAlert?.publishedAt ? 'Оголошено' : 'Оновлено'} {mapTime.format(new Date(eventTime))}
+        </time>}
+      </div>
+      <p className="map-navigation-hint" id="map-navigation-hint">Перетягуйте карту або використовуйте стрілки. Масштаб · Ctrl + колесо або жест двома пальцями.</p>
       <div className="map-footer">
         <span><i className="legend-swatch" /> {inExercise ? 'Тестова тривога' : 'Тривога'}</span>
         {!inExercise && <><span><i className="legend-swatch warning" /> Жовтий рівень</span>
@@ -215,9 +283,9 @@ export function Radar({ feed, location }: { feed: Feed; location: Location }) {
       </div>
     </section>
     <section className="panel region-panel">
-      <h2>Стан території</h2>
+      <h2>Вибір території</h2>
       <label htmlFor="radar-region">Область, місто або район</label>
-      <select id="radar-region" value={selected} onChange={event => selectRegion(event.target.value)}>
+      <select id="radar-region" value={selected} onChange={event => focusArea(event.target.value)}>
         <optgroup label="Області та міста">{mapRegions.map(area => <option key={area.id} value={area.id}>{area.name}</option>)}</optgroup>
         {mapRegions.map(region => {
           const areas = mapDistricts.filter(area => area.parentId === region.id);
@@ -226,12 +294,6 @@ export function Radar({ feed, location }: { feed: Feed; location: Location }) {
           </optgroup>;
         })}
       </select>
-      <div className="region-result" aria-live="polite">
-        <h3>{activeArea?.name}</h3>
-        <span className={'tag' + (isActive(getLevel(selected)) ? ' active-alert' : '')}>
-          {inExercise ? (selected === location.regionId ? 'Тестова тривога' : 'Без тестової події') : statusLabel(getLevel(selected))}
-        </span>
-      </div>
       <div className="exercise-panel">
         <h3>Навчальна тривога</h3>
         <p role="status">{exercise === 'ended' ? 'Тестову тривогу завершено.' :
