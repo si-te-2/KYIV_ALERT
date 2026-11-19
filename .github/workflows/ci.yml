@@ -1,0 +1,43 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - run: npm test
+        working-directory: frontend
+      - run: dotnet build backend/KyivAlert.Api/KyivAlert.Api.csproj --configuration Release
+      - run: dotnet test backend/KyivAlert.Tests/KyivAlert.Tests.csproj --configuration Release
+      - name: Verify locally served application
+        shell: bash
+        run: |
+          dotnet publish backend/KyivAlert.Api/KyivAlert.Api.csproj --configuration Release --output "$RUNNER_TEMP/kyiv-alert"
+          mkdir -p "$RUNNER_TEMP/kyiv-alert/wwwroot"
+          cp -R frontend/dist/. "$RUNNER_TEMP/kyiv-alert/wwwroot/"
+          cd "$RUNNER_TEMP/kyiv-alert"
+          dotnet KyivAlert.Api.dll > "$RUNNER_TEMP/kyiv-alert.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          curl --fail --retry 15 --retry-connrefused --retry-delay 1 http://127.0.0.1:5080/api/health
+          curl --fail http://127.0.0.1:5080/ | grep 'KYIV ALERT'
