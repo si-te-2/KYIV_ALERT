@@ -85,9 +85,14 @@ internal static class LoginCommand
             Console.Error.WriteLine("Login cancelled.");
             return 1;
         }
-        catch (TL.RpcException)
+        catch (TL.RpcException error)
         {
-            Console.Error.WriteLine("Telegram could not complete the login. Check the entered details or try again later.");
+            var code = System.Text.RegularExpressions.Regex.IsMatch(error.Message, "^[A-Z][A-Z_0-9]{2,80}$")
+                ? error.Message
+                : "TELEGRAM_RPC_ERROR";
+            File.WriteAllText(Path.Combine(dataDirectory, "last-login-error.txt"), code);
+            Console.Error.WriteLine($"Telegram rejected the login: {code}");
+            Console.Error.WriteLine("Return to the KYIV ALERT chat with this error code.");
             return 1;
         }
         catch (IOException)
@@ -95,9 +100,10 @@ internal static class LoginCommand
             Console.Error.WriteLine("Local session storage is unavailable or another login process is running.");
             return 1;
         }
-        catch (Exception)
+        catch (Exception error)
         {
-            Console.Error.WriteLine("Local login could not complete. Verify the credentials and network connection.");
+            File.WriteAllText(Path.Combine(dataDirectory, "last-login-error.txt"), error.GetType().Name);
+            Console.Error.WriteLine($"Local login could not complete ({error.GetType().Name}).");
             return 1;
         }
     }
