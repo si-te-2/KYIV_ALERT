@@ -29,6 +29,17 @@ jobs:
         working-directory: frontend
       - run: dotnet build backend/KyivAlert.Api/KyivAlert.Api.csproj --configuration Release
       - run: dotnet test backend/KyivAlert.Tests/KyivAlert.Tests.csproj --configuration Release
+      - name: Verify Telegram setup configuration
+        shell: bash
+        env:
+          KYIVALERT_Telegram__ApiId: '12345'
+          KYIVALERT_Telegram__ApiHash: '00000000000000000000000000000000'
+        run: |
+          dotnet run --project backend/KyivAlert.Telegram --configuration Release --no-build -- --check-config
+          if KYIVALERT_Telegram__ApiId=0 dotnet run --project backend/KyivAlert.Telegram --configuration Release --no-build -- --check-config; then
+            echo "Invalid credentials should fail validation"
+            exit 1
+          fi
       - name: Verify locally served application
         shell: bash
         run: |
