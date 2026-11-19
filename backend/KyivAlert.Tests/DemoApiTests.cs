@@ -26,6 +26,21 @@ public sealed class DemoApiTests
     }
 
     [Fact]
+    public async Task StatusListsRequestedTelegramChannelsAsPendingAccess()
+    {
+        await using var factory = new WebApplicationFactory<Program>();
+        using var client = factory.CreateClient();
+        var snapshot = await client.GetFromJsonAsync<SystemSnapshot>("/api/status");
+
+        Assert.NotNull(snapshot);
+        var pending = snapshot.Sources.Where(source => source.Status == "PENDING_ACCESS").ToArray();
+        Assert.Equal(
+            ["@ukraine_pyxx", "@smolii_ukraine", "@kyiv_nebo", "@StrategicaviationT", "@kpszsu", "@ppo_kiev", "@kievinfo_kyiv"],
+            pending.Select(source => source.Name));
+        Assert.All(pending, source => Assert.Equal($"https://t.me/{source.Name[1..]}", source.OriginalUrl));
+    }
+
+    [Fact]
     public void ApplicationRejectsLiveMode()
     {
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
