@@ -257,7 +257,7 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
   const warningMarkers = size.width && showDrone && !inExercise && droneFeed.status === 'ready'
     ? separateRegionMarkers(visibleWarnings.flatMap(entry => {
       const area = mapRegions.find(area => area.id === entry.regionId);
-      if (!area || entry.status !== 'CONFIRMED') return [];
+      if (!area || (entry.status !== 'CONFIRMED' && entry.status !== 'UNVERIFIED')) return [];
       const point = toScreen(camera, size, area);
       return point.x > 15 && point.y > 15 && point.x < size.width - 15 && point.y < size.height - 15
         ? [{ entry, name: area.name, ...point }] : [];
@@ -301,7 +301,8 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
           style={{ left: marker.left, top: marker.top }} aria-label={`Оголошення: ${marker.name}`}
           aria-pressed={selected === marker.id} onClick={() => selectRegion(marker.id)} />)}
         {warningMarkers.map(({ entry, name, x, y }) => <button key={entry.regionId} type="button"
-          className={`drone-marker ${entry.kind.toLowerCase()}`} style={{ left: x, top: y }} aria-label={`Регіональна загроза ${entry.kind === 'SHAHED' ? 'Shahed' : 'БпЛА'}: ${name}`}
+          className={`drone-marker ${entry.kind.toLowerCase()}${entry.status === 'UNVERIFIED' ? ' unverified' : ''}`} style={{ left: x, top: y }}
+          aria-label={`Регіональна загроза ${entry.kind === 'SHAHED' ? 'Shahed' : 'БпЛА'}${entry.status === 'UNVERIFIED' ? ' (неперевірено)' : ''}: ${name}`}
           aria-pressed={selectedWarning === entry.regionId} onClick={() => selectWarning(entry)}>
           {entry.kind === 'SHAHED' ? <ShahedIcon /> : <Drone size={17} aria-hidden="true" />}
         </button>)}

@@ -382,6 +382,13 @@ select { width: 100%; border: 1px solid #51466b; border-radius: 9px; background:
   transition: background var(--fast), box-shadow var(--fast);
 }
 .drone-marker.shahed { border-color: #ff8295; background: #61253a; color: #ffb7c7; box-shadow: 0 0 15px #f453736f; }
+/* Unofficial monitoring signal: dashed outline and a "?" badge, no glow. */
+.drone-marker.unverified { border-style: dashed; opacity: .88; box-shadow: none; }
+.drone-marker.unverified::after {
+  content: "?"; position: absolute; top: -7px; right: -7px; display: grid; place-items: center;
+  width: 15px; height: 15px; border-radius: 50%; background: #f6e4ff; color: #19182b;
+  font-size: .7rem; font-weight: 800; line-height: 1;
+}
 .shahed-icon {
   display: inline-block; width: 1.1em; height: 1.1em; flex-shrink: 0; background: currentColor;
   clip-path: polygon(50% 4%, 94% 87%, 67% 80%, 57% 74%, 57% 96%, 43% 96%, 43% 74%, 33% 80%, 6% 87%);

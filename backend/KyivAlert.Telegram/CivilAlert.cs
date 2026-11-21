@@ -12,7 +12,16 @@ public sealed record DroneWarning(string RegionId, string Kind, string Status, D
 
 public sealed record DroneWarningsSnapshot(string Status, DateTimeOffset? CheckedAt, IReadOnlyList<DroneWarning> Warnings)
 {
-    public static DroneWarningsSnapshot From(CivilAlertsSnapshot snapshot, DateTimeOffset now)
+    public static DroneWarningsSnapshot From(CivilAlertsSnapshot snapshot, DateTimeOffset now) =>
+        From(snapshot, [], now);
+
+    /// <summary>
+    /// Official warnings stay exactly as before. Unofficial monitoring signals are added as UNVERIFIED
+    /// only for a territory that has no official CONFIRMED warning, only while the feed is fresh,
+    /// and never after a newer official all-clear. One warning per territory.
+    /// </summary>
+    public static DroneWarningsSnapshot From(
+        CivilAlertsSnapshot snapshot, IReadOnlyList<MonitoringSignal> signals, DateTimeOffset now)
     {
         var available = snapshot.Status == "ready" && snapshot.CheckedAt is { } checkedAt &&
             now - checkedAt <= TimeSpan.FromMinutes(2);
@@ -23,8 +32,36 @@ public sealed record DroneWarningsSnapshot(string Status, DateTimeOffset? Checke
                 !available ? "CONNECTION LOST" :
                 now - alert.PublishedAt >= TimeSpan.FromHours(2) ? "OUTDATED" : "CONFIRMED",
                 alert.PublishedAt, alert.SourceUrl))
-            .ToArray();
+            .ToList();
+
+        if (available)
+        {
+            var unverified = UnverifiedWarnings(snapshot, signals, warnings, now);
+            warnings.RemoveAll(warning => warning.Status != "CONFIRMED" &&
+                unverified.Any(extra => extra.RegionId == warning.RegionId));
+            warnings.AddRange(unverified);
+        }
         return new(status, snapshot.CheckedAt, warnings);
+    }
+
+    private static List<DroneWarning> UnverifiedWarnings(
+        CivilAlertsSnapshot snapshot, IReadOnlyList<MonitoringSignal> signals,
+        IReadOnlyList<DroneWarning> official, DateTimeOffset now)
+    {
+        var confirmed = official.Where(warning => warning.Status == "CONFIRMED")
+            .Select(warning => warning.RegionId).ToHashSet();
+        return signals
+            .Where(signal => signal.PublishedAt <= now && now - signal.PublishedAt < MonitoringPostParser.SignalLifetime)
+            .Where(signal => !confirmed.Contains(signal.RegionId))
+            .Where(signal => !snapshot.Alerts.Any(alert => alert.RegionId == signal.RegionId && !alert.Active &&
+                alert.PublishedAt >= signal.PublishedAt))
+            .GroupBy(signal => signal.RegionId)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => group.OrderByDescending(signal => signal.Kind == "SHAHED")
+                .ThenByDescending(signal => signal.PublishedAt).First())
+            .Select(signal => new DroneWarning(signal.RegionId, signal.Kind, "UNVERIFIED",
+                signal.PublishedAt, signal.SourceUrl))
+            .ToList();
     }
 }
 
@@ -35,7 +72,7 @@ public static partial class CivilAlertParser
 
     private const string ShahedNamePattern = @"(?:Shahed|Герань|шахед(?:и|ів)?)";
     private const string ShahedVariant = @"(?:«" + ShahedNamePattern + @"»|""" + ShahedNamePattern + @"""|" + ShahedNamePattern + ")";
-    private const string DroneReason = @"(?:дронову загрозу|загрозу (?:застосування )?(?:(?:ударних )?БпЛА(?: типу " +
+    internal const string DroneReason = @"(?:дронову загрозу|загрозу (?:застосування )?(?:(?:ударних )?БпЛА(?: типу " +
         ShahedVariant + @")?|" + ShahedVariant + "))";
 
     [GeneratedRegex(@"^(?<symbol>🔴|🟡|🟢)\uFE0F?[ \t]+(?<region>м\. Київ|Київ|Київська область|Білоцерківський район|Бориспільський район|Броварський район|Бучанський район|Вишгородський район|Обухівський район|Фастівський район)[ \t]+[-–—][ \t]+(?<action>повітряна тривога|відбій повітряної тривоги)(?: через (?<reason>" + DroneReason + @"))?(?:, (?:жовтий|червоний) рівень)?[!.]?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
@@ -92,7 +129,7 @@ public static partial class CivilAlertParser
         return null;
     }
 
-    private static string? ClassifyReason(Group reason) =>
+    internal static string? ClassifyReason(Group reason) =>
         !reason.Success ? null : ShahedName().IsMatch(reason.Value) ? "SHAHED" : "UAV";
 
     private static bool? ParseCityNotice(string heading, string nextLine)

@@ -20,9 +20,10 @@ export function WarningDetails({ warning }: { warning: DroneWarning }) {
     <span className={`warning-status ${warning.kind.toLowerCase()}`} title={warning.status}>{credibilityLabels[warning.status]}</span>
     <h3>{threatLabels[warning.kind]}</h3>
     <p>{areaNames.get(warning.regionId)}</p>
-    <p>{warning.status === 'CONFIRMED' ? 'Офіційне оголошення' : 'Попереднє оголошення'} ·{' '}
+    <p>{warning.status === 'CONFIRMED' ? 'Офіційне оголошення'
+      : warning.status === 'UNVERIFIED' ? 'Неофіційне повідомлення з Telegram-каналу' : 'Попереднє оголошення'} ·{' '}
       <time dateTime={warning.publishedAt}>{kyivTime.format(new Date(warning.publishedAt))}</time></p>
-    {sourceNames[warning.regionId] && <p>{sourceNames[warning.regionId]}</p>}
+    {warning.status !== 'UNVERIFIED' && sourceNames[warning.regionId] && <p>{sourceNames[warning.regionId]}</p>}
     <a href={warning.sourceUrl} target="_blank" rel="noreferrer">
       {warning.status === 'UNVERIFIED' ? 'Першоджерело' : 'Оригінал офіційного оголошення'}
     </a>
@@ -56,7 +57,9 @@ export function DroneWarnings({ feed, warnings, shahedOnly, onFilter, onSelect }
         <button type="button" onClick={() => onSelect(warning)}>
           <strong>{areaNames.get(warning.regionId)}</strong>
           <span className={`warning-status ${warning.status === 'CONFIRMED' ? warning.kind.toLowerCase() : 'inactive'}`}>
-            {warning.status === 'CONFIRMED' ? threatLabels[warning.kind] : credibilityLabels[warning.status]}
+            {warning.status === 'CONFIRMED' ? threatLabels[warning.kind]
+              : warning.status === 'UNVERIFIED' ? `${threatLabels[warning.kind]} · ${credibilityLabels.UNVERIFIED}`
+              : credibilityLabels[warning.status]}
           </span>
         </button>
       </li>)}</ul>

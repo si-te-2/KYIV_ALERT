@@ -16,8 +16,10 @@ public sealed class CivilAlertsMonitor(
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(45);
     private static readonly TimeSpan FreshnessLimit = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan HistoryLimit = TimeSpan.FromHours(48);
+    private const int MonitoringHistoryLimit = 50;
     private CivilAlertsSnapshot snapshot = new(configuration.GetValue("CivilAlerts:Enabled", false)
         ? "connecting" : "disabled", null, []);
+    private IReadOnlyList<MonitoringSignal> monitoringSignals = [];
 
     public CivilAlertsSnapshot GetSnapshot()
     {
@@ -31,7 +33,8 @@ public sealed class CivilAlertsMonitor(
     }
 
     public DroneWarningsSnapshot GetDroneWarnings() =>
-        DroneWarningsSnapshot.From(Volatile.Read(ref snapshot), clock.GetUtcNow());
+        DroneWarningsSnapshot.From(
+            Volatile.Read(ref snapshot), Volatile.Read(ref monitoringSignals), clock.GetUtcNow());
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -94,23 +97,109 @@ public sealed class CivilAlertsMonitor(
             var channel = resolved.Channel ?? throw new InvalidOperationException("Official alert channel is unavailable.");
             channels.Add((username, channel));
         }
+        using var sessionStopping = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        var monitoring = PollMonitoringAsync(client, sessionStopping.Token);
+        try
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var now = clock.GetUtcNow();
+                var cutoff = now - HistoryLimit;
+                var alerts = new List<CivilAlert>();
+                foreach (var (username, channel) in channels)
+                {
+                    var latest = await client.Messages_GetHistory(channel, limit: 100).WaitAsync(RequestTimeout, stoppingToken);
+                    var posts = latest.Messages.OfType<Message>()
+                        .Where(message => message.date >= cutoff && message.date <= now && message.fwd_from is null)
+                        .Select(message => (message.id, new DateTimeOffset(message.date), message.message));
+                    if (CivilAlertParser.SelectLatest(username, posts) is { } alert) alerts.Add(alert);
+                }
 
+                Volatile.Write(ref snapshot, new("ready", clock.GetUtcNow(), alerts.AsReadOnly()));
+                await Task.Delay(PollInterval, clock, stoppingToken);
+            }
+        }
+        finally
+        {
+            await sessionStopping.CancelAsync();
+            try { await monitoring; }
+            catch (OperationCanceledException) when (sessionStopping.IsCancellationRequested) { }
+            Volatile.Write(ref monitoringSignals, Array.Empty<MonitoringSignal>());
+        }
+    }
+
+    private async Task PollMonitoringAsync(Client client, CancellationToken stoppingToken)
+    {
+        var channels = await ResolveMonitoringChannelsAsync(client, stoppingToken);
+        if (channels.Count == 0) return;
         while (!stoppingToken.IsCancellationRequested)
         {
-            var now = clock.GetUtcNow();
-            var cutoff = now - HistoryLimit;
-            var alerts = new List<CivilAlert>();
-            foreach (var (username, channel) in channels)
-            {
-                var latest = await client.Messages_GetHistory(channel, limit: 100).WaitAsync(RequestTimeout, stoppingToken);
-                var posts = latest.Messages.OfType<Message>()
-                    .Where(message => message.date >= cutoff && message.date <= now && message.fwd_from is null)
-                    .Select(message => (message.id, new DateTimeOffset(message.date), message.message));
-                if (CivilAlertParser.SelectLatest(username, posts) is { } alert) alerts.Add(alert);
-            }
-
-            Volatile.Write(ref snapshot, new("ready", clock.GetUtcNow(), alerts.AsReadOnly()));
+            Volatile.Write(ref monitoringSignals, await ReadMonitoringAsync(client, channels, stoppingToken));
             await Task.Delay(PollInterval, clock, stoppingToken);
         }
+    }
+
+    // Optional unofficial sources: CivilAlerts:MonitoringChannels as an array or a comma-separated string.
+    private IReadOnlyList<string> MonitoringChannelNames()
+    {
+        var section = configuration.GetSection("CivilAlerts:MonitoringChannels");
+        return section.GetChildren().Select(child => child.Value).Append(section.Value)
+            .SelectMany(value => (value ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Select(name => name.TrimStart('@'))
+            .Where(MonitoringPostParser.IsChannelName)
+            .Where(name => !name.Equals(CivilAlertParser.CityChannel, StringComparison.OrdinalIgnoreCase) &&
+                !name.Equals(CivilAlertParser.OblastChannel, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private async Task<List<(string Username, Channel Peer)>> ResolveMonitoringChannelsAsync(
+        Client client, CancellationToken stoppingToken)
+    {
+        var resolvedChannels = new List<(string Username, Channel Peer)>();
+        foreach (var username in MonitoringChannelNames())
+        {
+            try
+            {
+                var resolved = await client.Contacts_ResolveUsername(username).WaitAsync(RequestTimeout, stoppingToken);
+                if (resolved.Channel is { } channel) resolvedChannels.Add((username, channel));
+                else logger.LogWarning("Monitoring source {Channel} is not a public channel.", username);
+            }
+            catch (Exception error) when (!stoppingToken.IsCancellationRequested)
+            {
+                logger.LogWarning("Monitoring source {Channel} is unavailable ({ErrorType}).",
+                    username, error.GetType().Name);
+            }
+        }
+        return resolvedChannels;
+    }
+
+    // A failing monitoring channel is skipped. It never affects the official feed.
+    private async Task<IReadOnlyList<MonitoringSignal>> ReadMonitoringAsync(
+        Client client, List<(string Username, Channel Peer)> channels, CancellationToken stoppingToken)
+    {
+        var now = clock.GetUtcNow();
+        var cutoff = now - MonitoringPostParser.SignalLifetime;
+        var signals = new List<MonitoringSignal>();
+        foreach (var (username, channel) in channels)
+        {
+            try
+            {
+                var latest = await client.Messages_GetHistory(channel, limit: MonitoringHistoryLimit)
+                    .WaitAsync(RequestTimeout, stoppingToken);
+                foreach (var message in latest.Messages.OfType<Message>())
+                {
+                    if (message.fwd_from is not null || message.date < cutoff || message.date > now) continue;
+                    if (MonitoringPostParser.Parse(username, message.id, new DateTimeOffset(message.date), message.message)
+                        is { } signal) signals.Add(signal);
+                }
+            }
+            catch (Exception error) when (!stoppingToken.IsCancellationRequested)
+            {
+                logger.LogWarning("Monitoring source {Channel} could not be read ({ErrorType}).",
+                    username, error.GetType().Name);
+            }
+        }
+        return signals;
     }
 }

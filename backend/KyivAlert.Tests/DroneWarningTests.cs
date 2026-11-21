@@ -81,6 +81,71 @@ public sealed class DroneWarningTests
         Assert.Equal(badge, Assert.Single(result.Warnings).Status);
     }
 
+    private static MonitoringSignal Signal(string region, string kind, int minutesAgo) =>
+        new(region, kind, Now.AddMinutes(-minutesAgo), $"https://t.me/kyiv_nebo/{minutesAgo}");
+
+    [Fact]
+    public void MonitoringSignalsAreUnverifiedAndNeverOverrideOfficialWarnings()
+    {
+        var official = new CivilAlert("UA-30", true, Now.AddMinutes(-3), "https://t.me/VA_Kyiv/4", DroneKind: "UAV");
+        var result = DroneWarningsSnapshot.From(new("ready", Now, [official]),
+            [Signal("UA-30", "SHAHED", 1), Signal("UA-32", "SHAHED", 2)], Now);
+
+        Assert.Collection(result.Warnings,
+            warning => Assert.Equal(("UA-30", "UAV", "CONFIRMED"), (warning.RegionId, warning.Kind, warning.Status)),
+            warning =>
+            {
+                Assert.Equal(("UA-32", "SHAHED", "UNVERIFIED"), (warning.RegionId, warning.Kind, warning.Status));
+                Assert.Equal("https://t.me/kyiv_nebo/2", warning.SourceUrl);
+            });
+    }
+
+    [Theory]
+    [InlineData(29, 1)]
+    [InlineData(31, 0)]
+    public void UnverifiedSignalsExpireAfterThirtyMinutes(int ageMinutes, int expected)
+    {
+        var result = DroneWarningsSnapshot.From(new("ready", Now, []), [Signal("UA-30", "UAV", ageMinutes)], Now);
+        Assert.Equal(expected, result.Warnings.Count);
+    }
+
+    [Fact]
+    public void LostConnectionHidesUnverifiedSignals()
+    {
+        var result = DroneWarningsSnapshot.From(
+            new("unavailable", Now.AddSeconds(-10), []), [Signal("UA-30", "SHAHED", 1)], Now);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(10, false)]
+    public void NewerOfficialAllClearSuppressesUnverifiedSignals(int allClearMinutesAgo, bool suppressed)
+    {
+        var clear = new CivilAlert("UA-30", false, Now.AddMinutes(-allClearMinutesAgo), "https://t.me/VA_Kyiv/7");
+        var result = DroneWarningsSnapshot.From(new("ready", Now, [clear]), [Signal("UA-30", "SHAHED", 5)], Now);
+        Assert.Equal(suppressed, result.Warnings.Count == 0);
+    }
+
+    [Fact]
+    public void ShahedSignalWinsOverNewerGenericSignalForTheSameTerritory()
+    {
+        var result = DroneWarningsSnapshot.From(new("ready", Now, []),
+            [Signal("UA-30", "UAV", 1), Signal("UA-30", "SHAHED", 10)], Now);
+        var warning = Assert.Single(result.Warnings);
+        Assert.Equal(("SHAHED", "UNVERIFIED", "https://t.me/kyiv_nebo/10"),
+            (warning.Kind, warning.Status, warning.SourceUrl));
+    }
+
+    [Fact]
+    public void FreshSignalReplacesOutdatedOfficialWarningSoEachTerritoryAppearsOnce()
+    {
+        var outdated = new CivilAlert("UA-30", true, Now.AddHours(-3), "https://t.me/VA_Kyiv/2", DroneKind: "UAV");
+        var result = DroneWarningsSnapshot.From(new("ready", Now, [outdated]), [Signal("UA-30", "SHAHED", 2)], Now);
+        var warning = Assert.Single(result.Warnings);
+        Assert.Equal(("SHAHED", "UNVERIFIED"), (warning.Kind, warning.Status));
+    }
+
     [Fact]
     public async Task DisabledFeedNeverReturnsPlaceholderWarnings()
     {
