@@ -14,6 +14,8 @@ public sealed class DroneWarningTests
     [InlineData("kyivoda", "🔴 Київська область — повітряна тривога через загрозу застосування ударних БпЛА.", "UAV")]
     [InlineData("kyivoda", "🔴 Київська область — повітряна тривога через загрозу «Герань».", "SHAHED")]
     [InlineData("VA_Kyiv", "🔴 м. Київ — повітряна тривога через загрозу Shahed", "SHAHED")]
+    [InlineData("kyivoda", "🔴 Київська область — повітряна тривога через загрозу застосування ударних БпЛА типу «Шахед».", "SHAHED")]
+    [InlineData("VA_Kyiv", "🟡 Жовтий рівень небезпеки\nОголошено повітряну тривогу через загрозу БпЛА типу Shahed.", "SHAHED")]
     public void ReadsOnlyExplicitCivilReason(string source, string text, string kind)
     {
         var alert = Assert.IsType<CivilAlert>(CivilAlertParser.SelectLatest(source, [(4, Now, text)]));
@@ -43,6 +45,28 @@ public sealed class DroneWarningTests
         Assert.NotNull(result);
         Assert.Null(result.DroneKind);
         Assert.False(result.Active);
+    }
+
+    [Fact]
+    public void KeepsSimultaneousRegionalWarningsSeparate()
+    {
+        var city = Assert.IsType<CivilAlert>(CivilAlertParser.SelectLatest("VA_Kyiv",
+            [(4, Now.AddMinutes(-3), "🔴 м. Київ — повітряна тривога через загрозу Shahed")]));
+        var oblast = Assert.IsType<CivilAlert>(CivilAlertParser.SelectLatest("kyivoda",
+            [(9, Now.AddMinutes(-2), "🔴 Київська область — повітряна тривога через загрозу ударних БпЛА")]));
+        var result = DroneWarningsSnapshot.From(new("ready", Now, [city, oblast]), Now);
+
+        Assert.Collection(result.Warnings,
+            warning =>
+            {
+                Assert.Equal(("UA-30", "SHAHED", "CONFIRMED"), (warning.RegionId, warning.Kind, warning.Status));
+                Assert.Equal("https://t.me/VA_Kyiv/4", warning.SourceUrl);
+            },
+            warning =>
+            {
+                Assert.Equal(("UA-32", "UAV", "CONFIRMED"), (warning.RegionId, warning.Kind, warning.Status));
+                Assert.Equal("https://t.me/kyivoda/9", warning.SourceUrl);
+            });
     }
 
     [Theory]

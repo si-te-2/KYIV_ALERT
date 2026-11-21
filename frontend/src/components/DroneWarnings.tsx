@@ -6,6 +6,14 @@ import { credibilityLabels, droneNotice, kyivTime, officialMap, threatLabels } f
 const areaNames = new Map(mapRegions.map(area => [area.id, area.name]));
 const sourceLabels = { ready: 'Потік оновлюється', connecting: 'Підключення до джерела',
   unavailable: 'Зв’язок із джерелом втрачено', disabled: 'Telegram-моніторинг вимкнено' };
+const sourceNames: Record<string, string> = {
+  'UA-30': 'Київська міська військова адміністрація',
+  'UA-32': 'Київська обласна військова адміністрація',
+};
+
+export function ShahedIcon() {
+  return <i className="shahed-icon" aria-hidden="true" />;
+}
 
 export function WarningDetails({ warning }: { warning: DroneWarning }) {
   return <div className="warning-details">
@@ -14,25 +22,36 @@ export function WarningDetails({ warning }: { warning: DroneWarning }) {
     <p>{areaNames.get(warning.regionId)}</p>
     <p>{warning.status === 'CONFIRMED' ? 'Офіційне оголошення' : 'Попереднє оголошення'} ·{' '}
       <time dateTime={warning.publishedAt}>{kyivTime.format(new Date(warning.publishedAt))}</time></p>
+    {sourceNames[warning.regionId] && <p>{sourceNames[warning.regionId]}</p>}
     <a href={warning.sourceUrl} target="_blank" rel="noreferrer">
       {warning.status === 'UNVERIFIED' ? 'Першоджерело' : 'Оригінал офіційного оголошення'}
     </a>
   </div>;
 }
 
-export function DroneWarnings({ feed, onSelect }: { feed: DroneFeed; onSelect: (warning: DroneWarning) => void }) {
+export function DroneWarnings({ feed, warnings, shahedOnly, onFilter, onSelect }: {
+  feed: DroneFeed;
+  warnings: DroneWarning[];
+  shahedOnly: boolean;
+  onFilter: (shahedOnly: boolean) => void;
+  onSelect: (warning: DroneWarning) => void;
+}) {
   const sections = [
-    { name: 'Дійсні попередження', entries: feed.warnings.filter(warning => warning.status === 'CONFIRMED') },
-    { name: 'Потребують перевірки', entries: feed.warnings.filter(warning => warning.status !== 'CONFIRMED') },
+    { name: 'Дійсні попередження', entries: warnings.filter(warning => warning.status === 'CONFIRMED') },
+    { name: 'Потребують перевірки', entries: warnings.filter(warning => warning.status !== 'CONFIRMED') },
   ];
   return <section className="panel threat-panel" id="threats" aria-labelledby="threats-title">
     <p className="eyebrow"><Radio size={16} aria-hidden="true" /> DRONE THREAT RADAR</p>
     <h2 id="threats-title">Регіональні попередження</h2>
     <p className="threat-caution">{droneNotice}.</p>
+    <div className="threat-filters" role="group" aria-label="Тип загрози БпЛА">
+      <button type="button" aria-pressed={!shahedOnly} onClick={() => onFilter(false)}>Усі БпЛА</button>
+      <button type="button" aria-pressed={shahedOnly} onClick={() => onFilter(true)}><ShahedIcon /> Лише Shahed</button>
+    </div>
     <p className="threat-source-state" role="status"><TriangleAlert size={16} aria-hidden="true" />{sourceLabels[feed.status]}</p>
     {feed.checkedAt && <p className="threat-time">Остання синхронізація · <time dateTime={feed.checkedAt}>{kyivTime.format(new Date(feed.checkedAt))}</time></p>}
     {sections.map(section => section.entries.length > 0 && <div key={section.name} className="threat-group">
-      <h3>{section.name}</h3>
+      <h3>{section.name} <span className="threat-count">{section.entries.length}</span></h3>
       <ul>{section.entries.map(warning => <li key={warning.regionId}>
         <button type="button" onClick={() => onSelect(warning)}>
           <strong>{areaNames.get(warning.regionId)}</strong>
@@ -42,9 +61,10 @@ export function DroneWarnings({ feed, onSelect }: { feed: DroneFeed; onSelect: (
         </button>
       </li>)}</ul>
     </div>)}
-    {!feed.warnings.length && <p className="threat-empty">{feed.status === 'ready'
-      ? 'У підключених джерелах зараз немає окремих попереджень цього типу. Покриття Telegram: Київ і Київська область.'
+    {!warnings.length && <p className="threat-empty">{feed.status === 'ready'
+      ? 'У підключених джерелах зараз немає окремих попереджень цього типу.'
       : 'Актуальні попередження з Telegram недоступні.'}</p>}
+    <p className="threat-coverage">Покриття Telegram · Київ і Київська область</p>
     <a className="threat-official" href={officialMap} target="_blank" rel="noreferrer">Звірити стан повітряної тривоги</a>
   </section>;
 }

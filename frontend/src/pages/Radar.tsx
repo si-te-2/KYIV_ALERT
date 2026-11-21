@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Crosshair, Layers, Minus, Plus, PanelRightOpen, Radio, RotateCcw, RotateCw, Scan, Waves, X, Drone } from 'lucide-react';
 import { AlertFeedDrawer } from '../components/AlertFeedDrawer';
-import { DroneWarnings, WarningDetails } from '../components/DroneWarnings';
+import { DroneWarnings, ShahedIcon, WarningDetails } from '../components/DroneWarnings';
 import { alertLabels, isActive, statusLabel, type AlertLevel, type Feed } from '../hooks/useCivilAlerts';
 import type { DroneFeed, DroneWarning } from '../hooks/useDroneThreats';
 import { mapAreas, mapDistricts, mapRegions, type Location } from '../services/locations';
 import { countryView, getScale, keepPoint, toMap, toScreen, type Point } from '../services/mapCamera';
+import { separateRegionMarkers } from '../services/regionMarkers';
 
 const mapTime = new Intl.DateTimeFormat('uk-UA', {
   timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short',
@@ -45,6 +46,7 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
   const [districts, setDistricts] = useState(true);
   const [showCivil, setShowCivil] = useState(true);
   const [showDrone, setShowDrone] = useState(true);
+  const [shahedOnly, setShahedOnly] = useState(false);
   const [selectedWarning, setSelectedWarning] = useState<string>();
   const [size, setSize] = useState({ width: 0, height: 0 });
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -55,7 +57,8 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
   const lastCamera = useRef(camera);
   const shapes = useMemo(() => new Map(mapAreas.map(area => [area.id, new Path2D(area.path)])), []);
   const inExercise = exercise === 'active';
-  const warning = droneFeed.warnings.find(entry => entry.regionId === selectedWarning);
+  const visibleWarnings = shahedOnly ? droneFeed.warnings.filter(entry => entry.kind === 'SHAHED') : droneFeed.warnings;
+  const warning = visibleWarnings.find(entry => entry.regionId === selectedWarning);
   const activeArea = findArea(selected);
   const levels = useMemo(() => new Map(feed.alerts.map(alert => [alert.regionId, alert])), [feed.alerts]);
 
@@ -252,13 +255,13 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
   }) : [];
 
   const warningMarkers = size.width && showDrone && !inExercise && droneFeed.status === 'ready'
-    ? droneFeed.warnings.flatMap(entry => {
+    ? separateRegionMarkers(visibleWarnings.flatMap(entry => {
       const area = mapRegions.find(area => area.id === entry.regionId);
       if (!area || entry.status !== 'CONFIRMED') return [];
       const point = toScreen(camera, size, area);
       return point.x > 15 && point.y > 15 && point.x < size.width - 15 && point.y < size.height - 15
-        ? [{ entry, name: area.name, left: point.x, top: point.y }] : [];
-    }) : [];
+        ? [{ entry, name: area.name, ...point }] : [];
+    }).sort((a, b) => a.entry.regionId.localeCompare(b.entry.regionId)), size) : [];
 
   return <div className="radar-layout">
     <AlertFeedDrawer feed={feed} open={feedOpen} view={feedView} setView={setFeedView} onOpenChange={onFeedOpenChange} onSelect={chooseFromFeed} />
@@ -297,10 +300,10 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
         {mapMarkers.map(marker => <button key={marker.id} type="button" className={`map-pulse ${marker.level}`}
           style={{ left: marker.left, top: marker.top }} aria-label={`Оголошення: ${marker.name}`}
           aria-pressed={selected === marker.id} onClick={() => selectRegion(marker.id)} />)}
-        {warningMarkers.map(({ entry, name, left, top }) => <button key={entry.regionId} type="button"
-          className={`drone-marker ${entry.kind.toLowerCase()}`} style={{ left, top }} aria-label={`Регіональна загроза БпЛА: ${name}`}
+        {warningMarkers.map(({ entry, name, x, y }) => <button key={entry.regionId} type="button"
+          className={`drone-marker ${entry.kind.toLowerCase()}`} style={{ left: x, top: y }} aria-label={`Регіональна загроза ${entry.kind === 'SHAHED' ? 'Shahed' : 'БпЛА'}: ${name}`}
           aria-pressed={selectedWarning === entry.regionId} onClick={() => selectWarning(entry)}>
-          <Drone size={17} aria-hidden="true" />
+          {entry.kind === 'SHAHED' ? <ShahedIcon /> : <Drone size={17} aria-hidden="true" />}
         </button>)}
         {warning && !inExercise && <article className="map-warning-card" aria-label="Деталі регіонального попередження">
           <button type="button" className="drawer-close" aria-label="Закрити картку БпЛА"
@@ -327,11 +330,16 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
         <span><i className="legend-swatch" /> {inExercise ? 'Тестова тривога' : 'Тривога'}</span>
         {!inExercise && <><span><i className="legend-swatch warning" /> Жовтий рівень</span>
           <span><i className="legend-swatch partial" /> Часткова тривога</span></>}
+        {!inExercise && showDrone && <span className="shahed-legend"><ShahedIcon /> Загроза Shahed</span>}
         <span className="map-attribution"><a href="https://data.humdata.org/dataset/cod-ab-ukr" target="_blank" rel="noreferrer">Межі © OCHA / HDX</a></span>
       </div>
     </section>
     <div className="radar-sidebar">
-    <DroneWarnings feed={droneFeed} onSelect={selectWarning} />
+    <DroneWarnings feed={droneFeed} warnings={visibleWarnings} shahedOnly={shahedOnly} onSelect={selectWarning}
+      onFilter={only => {
+        setShahedOnly(only);
+        setSelectedWarning(undefined);
+      }} />
     <section className="panel region-panel">
       <h2>Вибір території</h2>
       <label htmlFor="radar-region">Область, місто або район</label>

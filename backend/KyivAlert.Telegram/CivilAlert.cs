@@ -33,7 +33,10 @@ public static partial class CivilAlertParser
     public const string CityChannel = "VA_Kyiv";
     public const string OblastChannel = "kyivoda";
 
-    private const string DroneReason = @"(?:дронову загрозу|загрозу застосування ударних БпЛА|загрозу ударних БпЛА|загрозу застосування БпЛА|загрозу БпЛА|загрозу застосування (?:«?Shahed»?|[«""]?Герань[»""]?|«?шахедів»?)|загрозу (?:«?Shahed»?|[«""]?Герань[»""]?|«?шахедів»?))";
+    private const string ShahedNamePattern = @"(?:Shahed|Герань|шахед(?:и|ів)?)";
+    private const string ShahedVariant = @"(?:«" + ShahedNamePattern + @"»|""" + ShahedNamePattern + @"""|" + ShahedNamePattern + ")";
+    private const string DroneReason = @"(?:дронову загрозу|загрозу (?:застосування )?(?:(?:ударних )?БпЛА(?: типу " +
+        ShahedVariant + @")?|" + ShahedVariant + "))";
 
     [GeneratedRegex(@"^(?<symbol>🔴|🟡|🟢)\uFE0F?[ \t]+(?<region>м\. Київ|Київ|Київська область|Білоцерківський район|Бориспільський район|Броварський район|Бучанський район|Вишгородський район|Обухівський район|Фастівський район)[ \t]+[-–—][ \t]+(?<action>повітряна тривога|відбій повітряної тривоги)(?: через (?<reason>" + DroneReason + @"))?(?:, (?:жовтий|червоний) рівень)?[!.]?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AlertHeading();
@@ -41,7 +44,7 @@ public static partial class CivilAlertParser
     [GeneratedRegex(@"^Оголошено повітряну тривогу через (?<reason>" + DroneReason + @")[!.]?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex CityDroneNotice();
 
-    [GeneratedRegex("shahed|герань|шахедів", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(ShahedNamePattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ShahedName();
 
     public static CivilAlert? SelectLatest(
