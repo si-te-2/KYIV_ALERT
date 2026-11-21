@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { Crosshair, Layers, Minus, Plus, PanelRightOpen, Radio, RotateCcw, RotateCw, Scan, Waves } from 'lucide-react';
+import { Crosshair, Layers, Minus, Plus, PanelRightOpen, Radio, RotateCcw, RotateCw, Scan, Waves, X, Drone } from 'lucide-react';
 import { AlertFeedDrawer } from '../components/AlertFeedDrawer';
+import { DroneWarnings, WarningDetails } from '../components/DroneWarnings';
 import { alertLabels, isActive, statusLabel, type AlertLevel, type Feed } from '../hooks/useCivilAlerts';
+import type { DroneFeed, DroneWarning } from '../hooks/useDroneThreats';
 import { mapAreas, mapDistricts, mapRegions, type Location } from '../services/locations';
 import { countryView, getScale, keepPoint, toMap, toScreen, type Point } from '../services/mapCamera';
 
@@ -28,16 +30,22 @@ const midpoint = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) /
 const distance = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y);
 const angleBetween = (a: Point, b: Point) => Math.atan2(b.y - a.y, b.x - a.x);
 
-export function Radar({ feed, location, feedOpen, onFeedOpenChange }: {
+export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedView, onFeedOpenChange }: {
   feed: Feed;
+  droneFeed: DroneFeed;
   location: Location;
   feedOpen: boolean;
+  feedView: 'active' | 'changes';
+  setFeedView: (view: 'active' | 'changes') => void;
   onFeedOpenChange: (open: boolean) => void;
 }) {
   const [selected, selectRegion] = useState(location.regionId);
   const [exercise, setExercise] = useState<'idle' | 'active' | 'ended'>('idle');
   const [camera, setCamera] = useState(countryView);
   const [districts, setDistricts] = useState(true);
+  const [showCivil, setShowCivil] = useState(true);
+  const [showDrone, setShowDrone] = useState(true);
+  const [selectedWarning, setSelectedWarning] = useState<string>();
   const [size, setSize] = useState({ width: 0, height: 0 });
   const canvas = useRef<HTMLCanvasElement>(null);
   const mapPanel = useRef<HTMLElement>(null);
@@ -47,6 +55,7 @@ export function Radar({ feed, location, feedOpen, onFeedOpenChange }: {
   const lastCamera = useRef(camera);
   const shapes = useMemo(() => new Map(mapAreas.map(area => [area.id, new Path2D(area.path)])), []);
   const inExercise = exercise === 'active';
+  const warning = droneFeed.warnings.find(entry => entry.regionId === selectedWarning);
   const activeArea = findArea(selected);
   const levels = useMemo(() => new Map(feed.alerts.map(alert => [alert.regionId, alert])), [feed.alerts]);
 
@@ -56,6 +65,10 @@ export function Radar({ feed, location, feedOpen, onFeedOpenChange }: {
 
   function getLevel(id: string): AlertLevel | undefined {
     return inExercise ? (id === location.regionId ? 'active' : undefined) : levels.get(id)?.level;
+  }
+
+  function mapLevel(id: string) {
+    return inExercise || showCivil ? getLevel(id) : undefined;
   }
 
   useEffect(() => {
@@ -120,15 +133,15 @@ export function Radar({ feed, location, feedOpen, onFeedOpenChange }: {
     }
 
     for (const region of mapRegions) {
-      const level = getLevel(region.id);
+      const level = mapLevel(region.id);
       paintArea(region.id, districts && level === 'partial' ? undefined : level, false);
     }
-    if (districts) for (const district of mapDistricts) paintArea(district.id, getLevel(district.id), true);
+    if (districts) for (const district of mapDistricts) paintArea(district.id, mapLevel(district.id), true);
     for (const region of mapRegions) {
       const shape = shapes.get(region.id);
       if (!shape) continue;
       context.lineWidth = 1.2 / scale;
-      context.strokeStyle = getLevel(region.id) === 'partial' ? '#bd92d5' : '#8490bb';
+      context.strokeStyle = mapLevel(region.id) === 'partial' ? '#bd92d5' : '#8490bb';
       context.stroke(shape);
     }
 
@@ -150,10 +163,10 @@ export function Radar({ feed, location, feedOpen, onFeedOpenChange }: {
       context.strokeStyle = '#12172a';
       context.lineWidth = 2.75;
       context.strokeText(area.label, label.x, label.y);
-      context.fillStyle = isActive(getLevel(area.id)) ? '#ffe0ee' : '#c9d3f1';
+      context.fillStyle = isActive(mapLevel(area.id)) ? '#ffe0ee' : '#c9d3f1';
       context.fillText(area.label, label.x, label.y);
     }
-  }, [camera, districts, inExercise, levels, location.regionId, selected, shapes, size]);
+  }, [camera, districts, inExercise, levels, location.regionId, selected, shapes, showCivil, size]);
 
   function focusArea(id: string) {
     const area = findArea(id);
@@ -166,11 +179,19 @@ export function Radar({ feed, location, feedOpen, onFeedOpenChange }: {
   }
 
   function chooseFromFeed(id: string) {
+    setSelectedWarning(undefined);
     setExercise('idle');
     setDistricts(true);
     focusArea(id);
     onFeedOpenChange(false);
     requestAnimationFrame(() => mapPanel.current?.focus());
+  }
+
+  function selectWarning(entry: DroneWarning) {
+    setSelectedWarning(entry.regionId);
+    setExercise('idle');
+    focusArea(entry.regionId);
+    mapSurface.current?.scrollIntoView({ block: 'nearest' });
   }
 
   function panFromKeyboard(event: KeyboardEvent<HTMLCanvasElement>) {
@@ -223,15 +244,24 @@ export function Radar({ feed, location, feedOpen, onFeedOpenChange }: {
   }
 
   const mapMarkers = size.width ? (districts ? [...mapDistricts, ...mapRegions] : mapRegions).flatMap(area => {
-    const level = getLevel(area.id);
+    const level = mapLevel(area.id);
     if (!isActive(level) || levels.get(area.id)?.inherited && !inExercise || (districts && level === 'partial' && mapRegions.some(region => region.id === area.id))) return [];
     const point = toScreen(camera, size, area);
     return point.x > 8 && point.y > 8 && point.x < size.width - 8 && point.y < size.height - 8
       ? [{ id: area.id, name: area.name, level, left: point.x, top: point.y }] : [];
   }) : [];
 
+  const warningMarkers = size.width && showDrone && !inExercise && droneFeed.status === 'ready'
+    ? droneFeed.warnings.flatMap(entry => {
+      const area = mapRegions.find(area => area.id === entry.regionId);
+      if (!area || entry.status !== 'CONFIRMED') return [];
+      const point = toScreen(camera, size, area);
+      return point.x > 15 && point.y > 15 && point.x < size.width - 15 && point.y < size.height - 15
+        ? [{ entry, name: area.name, left: point.x, top: point.y }] : [];
+    }) : [];
+
   return <div className="radar-layout">
-    <AlertFeedDrawer feed={feed} open={feedOpen} onOpenChange={onFeedOpenChange} onSelect={chooseFromFeed} />
+    <AlertFeedDrawer feed={feed} open={feedOpen} view={feedView} setView={setFeedView} onOpenChange={onFeedOpenChange} onSelect={chooseFromFeed} />
     <section ref={mapPanel} tabIndex={-1} className="panel map-panel" aria-label="Карта України">
       <div className="map-heading">
         <div><p className="eyebrow"><Waves size={16} aria-hidden="true" /> Огляд</p><h2>Карта України</h2></div>
@@ -246,9 +276,17 @@ export function Radar({ feed, location, feedOpen, onFeedOpenChange }: {
       </div>
       <div className="map-shortcuts">
         <button type="button" className="map-toggle" aria-pressed={districts} onClick={() => setDistricts(value => !value)}><Layers size={16} /> Райони</button>
+        <button type="button" aria-pressed={showCivil} onClick={() => setShowCivil(value => !value)}>Тривоги</button>
+        <button type="button" aria-pressed={showDrone} onClick={() => {
+          setShowDrone(value => !value);
+          if (showDrone) setSelectedWarning(undefined);
+        }}><Drone size={16} aria-hidden="true" /> БпЛА</button>
         <button type="button" onClick={() => focusArea('UA-51')}>Одещина</button>
         <button type="button" onClick={() => focusArea('UA-65')}>Херсонщина</button>
-        <button type="button" className="map-feed-button" onClick={() => onFeedOpenChange(true)} aria-haspopup="dialog">
+        <button type="button" className="map-feed-button" onClick={() => {
+          setFeedView('active');
+          onFeedOpenChange(true);
+        }} aria-haspopup="dialog">
           <PanelRightOpen size={16} aria-hidden="true" /> Стрічка тривог
         </button>
       </div>
@@ -259,6 +297,16 @@ export function Radar({ feed, location, feedOpen, onFeedOpenChange }: {
         {mapMarkers.map(marker => <button key={marker.id} type="button" className={`map-pulse ${marker.level}`}
           style={{ left: marker.left, top: marker.top }} aria-label={`Оголошення: ${marker.name}`}
           aria-pressed={selected === marker.id} onClick={() => selectRegion(marker.id)} />)}
+        {warningMarkers.map(({ entry, name, left, top }) => <button key={entry.regionId} type="button"
+          className={`drone-marker ${entry.kind.toLowerCase()}`} style={{ left, top }} aria-label={`Регіональна загроза БпЛА: ${name}`}
+          aria-pressed={selectedWarning === entry.regionId} onClick={() => selectWarning(entry)}>
+          <Drone size={17} aria-hidden="true" />
+        </button>)}
+        {warning && !inExercise && <article className="map-warning-card" aria-label="Деталі регіонального попередження">
+          <button type="button" className="drawer-close" aria-label="Закрити картку БпЛА"
+            onClick={() => setSelectedWarning(undefined)}><X size={18} aria-hidden="true" /></button>
+          <WarningDetails warning={warning} />
+        </article>}
         {inExercise && <span className="map-demo">НАВЧАЛЬНИЙ РЕЖИМ</span>}
       </div>
       <div className="map-selection" aria-live="polite">
@@ -282,6 +330,8 @@ export function Radar({ feed, location, feedOpen, onFeedOpenChange }: {
         <span className="map-attribution"><a href="https://data.humdata.org/dataset/cod-ab-ukr" target="_blank" rel="noreferrer">Межі © OCHA / HDX</a></span>
       </div>
     </section>
+    <div className="radar-sidebar">
+    <DroneWarnings feed={droneFeed} onSelect={selectWarning} />
     <section className="panel region-panel">
       <h2>Вибір території</h2>
       <label htmlFor="radar-region">Область, місто або район</label>
@@ -304,5 +354,6 @@ export function Radar({ feed, location, feedOpen, onFeedOpenChange }: {
         }}>{inExercise ? 'Завершити тест' : 'Запустити тест'}</button>
       </div>
     </section>
+    </div>
   </div>;
 }

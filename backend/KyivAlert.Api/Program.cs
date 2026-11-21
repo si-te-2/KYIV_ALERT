@@ -47,6 +47,7 @@ app.MapGet("/api/status", (ISystemSnapshotProvider provider) => {
     };
 });
 app.MapGet("/api/civil-alerts", (RegionalAlerts alerts) => alerts.Read());
+app.MapGet("/api/drone-warnings", (CivilAlertsMonitor monitor) => monitor.GetDroneWarnings());
 app.Run();
 
 public partial class Program;

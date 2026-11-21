@@ -27,8 +27,11 @@ public sealed class CivilAlertsMonitor(
         {
             return new("unavailable", checkedAt, []);
         }
-        return current;
+        return current.Status == "unavailable" ? current with { Alerts = [] } : current;
     }
+
+    public DroneWarningsSnapshot GetDroneWarnings() =>
+        DroneWarningsSnapshot.From(Volatile.Read(ref snapshot), clock.GetUtcNow());
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -47,7 +50,7 @@ public sealed class CivilAlertsMonitor(
             catch (Exception error)
             {
                 logger.LogWarning("Civil alert feed unavailable ({ErrorType}).", error.GetType().Name);
-                Volatile.Write(ref snapshot, new("unavailable", GetSnapshot().CheckedAt, []));
+                Volatile.Write(ref snapshot, Volatile.Read(ref snapshot) with { Status = "unavailable" });
                 await Task.Delay(TimeSpan.FromMinutes(2), clock, stoppingToken);
             }
         }
@@ -94,13 +97,14 @@ public sealed class CivilAlertsMonitor(
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var cutoff = clock.GetUtcNow() - HistoryLimit;
+            var now = clock.GetUtcNow();
+            var cutoff = now - HistoryLimit;
             var alerts = new List<CivilAlert>();
             foreach (var (username, channel) in channels)
             {
                 var latest = await client.Messages_GetHistory(channel, limit: 100).WaitAsync(RequestTimeout, stoppingToken);
                 var posts = latest.Messages.OfType<Message>()
-                    .Where(message => message.date >= cutoff && message.fwd_from is null)
+                    .Where(message => message.date >= cutoff && message.date <= now && message.fwd_from is null)
                     .Select(message => (message.id, new DateTimeOffset(message.date), message.message));
                 if (CivilAlertParser.SelectLatest(username, posts) is { } alert) alerts.Add(alert);
             }

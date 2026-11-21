@@ -9,15 +9,16 @@ const formatTime = new Intl.DateTimeFormat('uk-UA', {
   timeZone: 'Europe/Kyiv', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
 });
 
-export function AlertFeedDrawer({ feed, open, onOpenChange, onSelect }: {
+export function AlertFeedDrawer({ feed, open, view, setView, onOpenChange, onSelect }: {
   feed: Feed;
   open: boolean;
+  view: 'active' | 'changes';
+  setView: (value: 'active' | 'changes') => void;
   onOpenChange: (value: boolean) => void;
   onSelect: (regionId: string) => void;
 }) {
   const drawer = useRef<HTMLDialogElement>(null);
   const previous = useRef<Feed | null>(null);
-  const [view, setView] = useState<'active' | 'changes'>('active');
   const [changes, setChanges] = useState<AlertActivity[]>([]);
   const [search, setSearch] = useState('');
   const active = activeCivilAlerts(feed);

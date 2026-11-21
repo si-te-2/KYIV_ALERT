@@ -30,7 +30,8 @@ export function CivilAlertsPanel({ feed, location, notifications, enableNotifica
         <button className="secondary-button" type="button" onClick={enableNotifications}>
           <Bell size={16} aria-hidden="true" /> Увімкнути сповіщення
         </button>}
-      <p>{notifications === 'granted' ? 'Сповіщення увімкнено, поки сайт відкрито.' :
+      <p>{notifications === 'off' ? 'Сповіщення вимкнено в налаштуваннях.' :
+        notifications === 'granted' ? 'Сповіщення увімкнено, поки сайт відкрито.' :
         notifications === 'denied' ? 'Браузер заблокував сповіщення.' :
         notifications === 'unsupported' ? 'Браузер не підтримує сповіщення на цьому пристрої.' :
         'Сповіщення працюють, поки сайт відкрито.'}</p>

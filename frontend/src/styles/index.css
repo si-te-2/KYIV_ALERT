@@ -330,3 +330,90 @@ select { width: 100%; border: 1px solid #51466b; border-radius: 9px; background:
   .alert-drawer[open] { animation: drawer-in .26s cubic-bezier(.18,.78,.27,1) both; }
   @keyframes drawer-in { from { transform: translateX(100%); opacity: .5; } to { transform: translateX(0); opacity: 1; } }
 }
+
+.brand small { display: block; margin-top: 2px; color: var(--muted); font-size: .62rem; letter-spacing: .09em; }
+.monitoring-header-row {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 5px 14px;
+  width: min(1250px, calc(100% - 72px)); margin: 0 auto; padding: 0 0 9px;
+}
+.monitoring-header-row nav { display: flex; flex-wrap: wrap; gap: 3px; }
+.monitoring-header-row nav :is(a, button), .theme-toggle {
+  display: inline-flex; align-items: center; min-height: 35px; padding: 6px 9px; border-radius: 8px; color: var(--text);
+}
+.monitoring-header-row nav :is(a, button) { font-size: .875rem; }
+.monitoring-header-row nav :is(a, button):hover, .theme-toggle:hover { background: #8171ac33; }
+.theme-toggle { justify-content: center; min-width: 35px; border: 1px solid var(--border); }
+.sync-indicator { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .78rem; }
+.sync-indicator > span { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: #ecab74; }
+.sync-indicator[data-connected="true"] > span { background: #71c7a3; }
+.radar-sidebar { display: grid; gap: 14px; min-width: 0; }
+.threat-panel { min-width: 0; background: linear-gradient(155deg, #26203be8, #16192eed); backdrop-filter: blur(12px); }
+.threat-panel h2 { margin-bottom: 8px; }
+.threat-caution, .threat-empty, .threat-time { color: var(--muted); font-size: .875rem; }
+.threat-source-state { display: flex; align-items: center; gap: 7px; margin: 12px 0 3px; color: #f3bf95; font-size: .875rem; }
+.threat-empty { margin: 12px 0; }
+.threat-group { margin: 14px 0; }
+.threat-group h3 { margin-bottom: 6px; font-size: .9rem; }
+.threat-group ul { display: grid; gap: 6px; }
+.threat-group button {
+  display: grid; gap: 4px; width: 100%; padding: 9px; border: 1px solid var(--border); border-radius: 9px;
+  background: #8b7cab18; text-align: left; font-size: .875rem;
+}
+.threat-group button:hover { background: #8b7cab33; }
+.warning-status { font-size: .78rem; font-weight: 700; }
+.warning-status.shahed { color: #ffacd4; }
+.warning-status.uav { color: #ffd1a2; }
+.warning-status.inactive { color: var(--muted); }
+.threat-official, .warning-details a { display: inline-block; margin-top: 9px; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; font-size: .875rem; }
+.drone-marker {
+  position: absolute; z-index: 2; display: grid; place-items: center; width: 33px; height: 33px;
+  transform: translate(-50%, -86%); border: 1px solid #f8bc91; border-radius: 10px;
+  background: #4c2d22; color: #ffd0a0; box-shadow: 0 0 14px #f7a36d65;
+  transition: background var(--fast), box-shadow var(--fast);
+}
+.drone-marker.shahed { border-color: #f2a2ba; background: #55243c; color: #ffd1e3; box-shadow: 0 0 14px #ee84a565; }
+.drone-marker:hover, .drone-marker[aria-pressed="true"] { box-shadow: 0 0 0 2px #f6e4ff, 0 0 16px #f6e4ff55; }
+.map-warning-card {
+  position: absolute; z-index: 3; inset: auto 10px 10px auto; width: min(285px, calc(100% - 20px));
+  max-height: calc(100% - 20px); overflow-y: auto; padding: 11px 13px; border: 1px solid #75658f; border-radius: 12px;
+  background: #19182bea; color: #f5f1ff; backdrop-filter: blur(12px); box-shadow: 0 10px 24px #08061791;
+}
+.map-warning-card .drawer-close { float: right; width: 32px; height: 32px; color: #d8cfea; }
+.warning-details h3 { margin: 4px 0; font-size: .98rem; }
+.warning-details p { color: #dacfea; font-size: .84rem; }
+.warning-details a { color: #e5d4ff; }
+.monitor-dialog { max-height: min(82dvh, 700px); overflow-y: auto; }
+.source-list { display: grid; gap: 12px; margin: 14px 0; }
+.source-list p { font-size: .875rem; }
+.settings-opt-in { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.settings-regions { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 6px 10px; margin-top: 12px; }
+.settings-regions legend { margin-bottom: 9px; font-weight: 700; }
+.settings-regions label { display: flex; align-items: start; gap: 7px; padding: 4px 0; font-size: .875rem; }
+.settings-regions input { margin-top: 4px; }
+.legal-main { padding-block: 22px; }
+.legal-page { max-width: 78ch; margin: 14px auto 0; padding: clamp(16px, 4vw, 35px); }
+.legal-page h1 { font-size: clamp(1.7rem, 4vw, 2.65rem); font-weight: 800; }
+.legal-page h2 { margin-top: 20px; }
+.legal-page p, .legal-page .secondary-button { margin-top: 8px; }
+
+:root[data-theme="light"] { color-scheme: light; --text: #251e33; --muted: #514560; --border: #b7accd; --accent: #532c83; --panel: #f8f5ff; color: var(--text); background: #e8e1f3; }
+[data-theme="light"] body { background: radial-gradient(ellipse at 50% 0%, #f5eeff, #e7dff0 68%); }
+[data-theme="light"] .site-header { background: #fbf7ffdf; border-color: #b7accd; }
+[data-theme="light"] .hero :is(h1, p, .hero-caption) { color: #f5efff; }
+[data-theme="light"] .hero .location-picker :is(h2, p), [data-theme="light"] .hero .secondary-button { color: var(--text); }
+[data-theme="light"] :is(.radar-notice, .map-selection, .threat-panel, .alert-drawer, .drawer-tabs, .drawer-body input, .drawer-entry, .inbox-entry, .inbox-button, .location-chip, .map-controls button, .map-shortcuts button, select, .segmented, .secondary-button) {
+  border-color: var(--border); background: #eee8f7; color: var(--text);
+}
+[data-theme="light"] :is(.map-shortcuts button[aria-pressed="true"], .drawer-tabs button[aria-pressed="true"], .segmented button[aria-pressed="true"], .map-shortcuts .map-feed-button) { background: #dcd0ee; color: var(--text); }
+[data-theme="light"] .regional-active { background: #f6e4ef; }
+[data-theme="light"] .regional-level, [data-theme="light"] .threat-panel .warning-status.shahed { color: #86194c; }
+[data-theme="light"] .threat-source-state, [data-theme="light"] .threat-panel .warning-status.uav { color: #8c400b; }
+[data-theme="light"] :is(a, button, select):focus-visible { outline-color: #673598; }
+[data-theme="light"] .drawer-footer a { color: var(--accent); }
+@media (max-width: 880px) { .monitoring-header-row { width: calc(100% - 38px); } }
+@media (max-width: 600px) {
+  .monitoring-header-row { width: calc(100% - 28px); }
+  .monitoring-header-row nav { column-gap: 0; }
+  .monitoring-header-row nav :is(a, button) { padding-inline: 6px; font-size: .78rem; }
+  .brand small { font-size: .51rem; }
+}

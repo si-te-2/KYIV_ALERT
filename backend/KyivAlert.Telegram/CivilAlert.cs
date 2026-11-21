@@ -3,17 +3,46 @@ using System.Text.RegularExpressions;
 namespace KyivAlert.Telegram;
 
 public sealed record CivilAlert(
-    string RegionId, bool Active, DateTimeOffset PublishedAt, string SourceUrl, bool Partial = false);
+    string RegionId, bool Active, DateTimeOffset PublishedAt, string SourceUrl, bool Partial = false,
+    string? DroneKind = null);
 
 public sealed record CivilAlertsSnapshot(string Status, DateTimeOffset? CheckedAt, IReadOnlyList<CivilAlert> Alerts);
+
+public sealed record DroneWarning(string RegionId, string Kind, string Status, DateTimeOffset PublishedAt, string SourceUrl);
+
+public sealed record DroneWarningsSnapshot(string Status, DateTimeOffset? CheckedAt, IReadOnlyList<DroneWarning> Warnings)
+{
+    public static DroneWarningsSnapshot From(CivilAlertsSnapshot snapshot, DateTimeOffset now)
+    {
+        var available = snapshot.Status == "ready" && snapshot.CheckedAt is { } checkedAt &&
+            now - checkedAt <= TimeSpan.FromMinutes(2);
+        var status = !available && snapshot.Status == "ready" ? "unavailable" : snapshot.Status;
+        var warnings = snapshot.Alerts
+            .Where(alert => alert.Active && !alert.Partial && alert.DroneKind is not null && alert.PublishedAt <= now)
+            .Select(alert => new DroneWarning(alert.RegionId, alert.DroneKind!,
+                !available ? "CONNECTION LOST" :
+                now - alert.PublishedAt >= TimeSpan.FromHours(2) ? "OUTDATED" : "CONFIRMED",
+                alert.PublishedAt, alert.SourceUrl))
+            .ToArray();
+        return new(status, snapshot.CheckedAt, warnings);
+    }
+}
 
 public static partial class CivilAlertParser
 {
     public const string CityChannel = "VA_Kyiv";
     public const string OblastChannel = "kyivoda";
 
-    [GeneratedRegex(@"^(?<symbol>🔴|🟡|🟢)\uFE0F?[ \t]+(?<region>м\. Київ|Київ|Київська область|Білоцерківський район|Бориспільський район|Броварський район|Бучанський район|Вишгородський район|Обухівський район|Фастівський район)[ \t]+[-–—][ \t]+(?<action>повітряна тривога|відбій повітряної тривоги)(?:, (?:жовтий|червоний) рівень)?[!.]?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private const string DroneReason = @"(?:дронову загрозу|загрозу застосування ударних БпЛА|загрозу ударних БпЛА|загрозу застосування БпЛА|загрозу БпЛА|загрозу застосування (?:«?Shahed»?|[«""]?Герань[»""]?|«?шахедів»?)|загрозу (?:«?Shahed»?|[«""]?Герань[»""]?|«?шахедів»?))";
+
+    [GeneratedRegex(@"^(?<symbol>🔴|🟡|🟢)\uFE0F?[ \t]+(?<region>м\. Київ|Київ|Київська область|Білоцерківський район|Бориспільський район|Броварський район|Бучанський район|Вишгородський район|Обухівський район|Фастівський район)[ \t]+[-–—][ \t]+(?<action>повітряна тривога|відбій повітряної тривоги)(?: через (?<reason>" + DroneReason + @"))?(?:, (?:жовтий|червоний) рівень)?[!.]?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AlertHeading();
+
+    [GeneratedRegex(@"^Оголошено повітряну тривогу через (?<reason>" + DroneReason + @")[!.]?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex CityDroneNotice();
+
+    [GeneratedRegex("shahed|герань|шахедів", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ShahedName();
 
     public static CivilAlert? SelectLatest(
         string channel, IEnumerable<(int Id, DateTimeOffset Date, string Text)> posts)
@@ -27,9 +56,11 @@ public static partial class CivilAlertParser
         {
             var newline = text.IndexOf('\n');
             var heading = (newline < 0 ? text : text[..newline]).Trim();
-            if (channel == CityChannel && id > 0 && ParseCityNotice(heading, newline < 0 ? "" : text[(newline + 1)..]) is { } cityActive)
+            var nextLine = newline < 0 ? "" : text[(newline + 1)..].Split('\n', 2)[0].Trim();
+            if (channel == CityChannel && id > 0 && ParseCityNotice(heading, nextLine) is { } cityActive)
             {
-                return new(regionId, cityActive, date, $"https://t.me/{channel}/{id}");
+                return new(regionId, cityActive, date, $"https://t.me/{channel}/{id}",
+                    DroneKind: cityActive ? ClassifyReason(CityDroneNotice().Match(nextLine).Groups["reason"]) : null);
             }
 
             var match = AlertHeading().Match(heading);
@@ -37,7 +68,7 @@ public static partial class CivilAlertParser
 
             var active = !match.Groups["action"].Value.StartsWith("відбій", StringComparison.OrdinalIgnoreCase);
             var symbol = match.Groups["symbol"].Value;
-            if (active == (symbol == "🟢")) continue;
+            if (active == (symbol == "🟢") || (!active && match.Groups["reason"].Success)) continue;
 
             var region = match.Groups["region"].Value;
             var city = region.Equals("м. Київ", StringComparison.OrdinalIgnoreCase) ||
@@ -47,7 +78,8 @@ public static partial class CivilAlertParser
             var district = region.EndsWith(" район", StringComparison.OrdinalIgnoreCase);
             if (!district)
             {
-                return hasDistrictUpdate ? null : new(regionId, active, date, $"https://t.me/{channel}/{id}");
+                return hasDistrictUpdate ? null : new(regionId, active, date, $"https://t.me/{channel}/{id}",
+                    DroneKind: ClassifyReason(match.Groups["reason"]));
             }
 
             hasDistrictUpdate = true;
@@ -57,7 +89,10 @@ public static partial class CivilAlertParser
         return null;
     }
 
-    private static bool? ParseCityNotice(string heading, string details)
+    private static string? ClassifyReason(Group reason) =>
+        !reason.Success ? null : ShahedName().IsMatch(reason.Value) ? "SHAHED" : "UAV";
+
+    private static bool? ParseCityNotice(string heading, string nextLine)
     {
         heading = heading.Replace("\uFE0F", "").TrimEnd('.', '!');
         if (heading == "🟢 Відбій повітряної тривоги") return false;
@@ -65,7 +100,6 @@ public static partial class CivilAlertParser
         if (heading is not ("🟡 Жовтий рівень небезпеки" or "🔴 Червоний рівень небезпеки"))
             return null;
 
-        var nextLine = details.Split('\n', 2)[0].Trim();
         return nextLine.StartsWith("Оголошено повітряну тривогу", StringComparison.OrdinalIgnoreCase)
             ? true
             : null;

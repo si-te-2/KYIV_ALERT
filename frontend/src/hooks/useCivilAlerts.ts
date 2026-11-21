@@ -28,8 +28,15 @@ export function isActive(level?: AlertLevel) {
   return level === 'active' || level === 'partial' || level === 'warning';
 }
 
+const initial: Feed = { status: 'connecting', checkedAt: null, alerts: [] };
+const onCivilFailure = (previous: Feed): Feed => ({ ...previous, status: 'unavailable', alerts: [] });
+
 export function useCivilAlerts() {
-  const [feed, setFeed] = useState<Feed>({ status: 'connecting', checkedAt: null, alerts: [] });
+  return usePollingFeed('/api/civil-alerts', initial, onCivilFailure);
+}
+
+export function usePollingFeed<T>(url: string, initialFeed: T, onFailure: (previous: T) => T) {
+  const [feed, setFeed] = useState(initialFeed);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -37,15 +44,15 @@ export function useCivilAlerts() {
 
     async function refresh() {
       try {
-        const response = await fetch('/api/civil-alerts', {
+        const response = await fetch(url, {
           cache: 'no-store',
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),
         });
         if (!response.ok) throw new Error('Regional alerts unavailable.');
-        const next = await response.json() as Feed;
+        const next = await response.json() as T;
         if (!controller.signal.aborted) setFeed(next);
       } catch {
-        if (!controller.signal.aborted) setFeed({ status: 'unavailable', checkedAt: null, alerts: [] });
+        if (!controller.signal.aborted) setFeed(onFailure);
       } finally {
         if (!controller.signal.aborted) timer = setTimeout(refresh, 10000);
       }
@@ -56,7 +63,7 @@ export function useCivilAlerts() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, []);
+  }, [url, onFailure]);
 
   return feed;
 }

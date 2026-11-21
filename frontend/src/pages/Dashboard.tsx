@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, BellRing, ChevronDown, Info, MapPin, MessageSquareText, PanelRightOpen, X, Radar as RadarIcon, Waves } from 'lucide-react';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, BellRing, ChevronDown, Info, MapPin, MessageSquareText, Moon, Sun, X, Radar as RadarIcon, Waves } from 'lucide-react';
 import { CivilAlertsPanel } from '../components/CivilAlertsPanel';
-import { alertLabels, isActive, statusLabel, useCivilAlerts, type AlertLevel } from '../hooks/useCivilAlerts';
+import { MonitoringSettings } from '../components/MonitoringSettings';
+import { isActive, statusLabel, useCivilAlerts } from '../hooks/useCivilAlerts';
+import { useDroneThreats } from '../hooks/useDroneThreats';
+import { useMonitoringNotifications } from '../hooks/useMonitoringNotifications';
 import { cityOptions, districtOptions, findLocation, mapAreas, mapDistricts, oblastOptions, type Location } from '../services/locations';
+import { kyivTime, officialMap } from '../services/monitoring';
+import { locationKey, readMonitoringPreferences, saveMonitoringPreferences, type MonitoringPreferences } from '../services/monitoringPreferences';
+import { Legal } from './Legal';
 import { Radar } from './Radar';
-
-const locationKey = 'kyiv-alert-location';
 
 function readLocation() {
   try {
@@ -13,40 +17,6 @@ function readLocation() {
   } catch {
     return null;
   }
-}
-
-function notificationPermission() {
-  return typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
-}
-
-function useRegionalNotifications(regionId: string | undefined, name: string | undefined, level: AlertLevel | undefined) {
-  const [permission, setPermission] = useState(notificationPermission);
-  const previous = useRef<{ regionId: string; level: AlertLevel } | null>(null);
-
-  useEffect(() => {
-    if (!regionId || !level) return;
-    const last = previous.current;
-    previous.current = { regionId, level };
-    if (last?.regionId !== regionId || last.level === level || !isActive(level) || permission !== 'granted') return;
-
-    try {
-      const title = level === 'partial' && /^UA\d/.test(regionId) ? 'Тривога в частині району' : alertLabels[level];
-      new Notification(title, { body: name, tag: `kyiv-alert-${regionId}` });
-    } catch {
-      setPermission('unsupported');
-    }
-  }, [level, name, permission, regionId]);
-
-  async function enable() {
-    if (typeof Notification === 'undefined') return;
-    try {
-      setPermission(await Notification.requestPermission());
-    } catch {
-      setPermission('unsupported');
-    }
-  }
-
-  return { permission, enable };
 }
 
 function RegionForm({ location, onSave, onCancel }: {
@@ -102,13 +72,54 @@ export function Dashboard() {
   const [location, setLocation] = useState(readLocation);
   const [editing, setEditing] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
+  const [feedView, setFeedView] = useState<'active' | 'changes'>('active');
+  const [preferences, setPreferences] = useState(readMonitoringPreferences);
+  const [hash, setHash] = useState(() => window.location.hash);
   const radar = useRef<HTMLElement>(null);
   const locationPicker = useRef<HTMLDivElement>(null);
   const messages = useRef<HTMLDialogElement>(null);
+  const sources = useRef<HTMLDialogElement>(null);
+  const settings = useRef<HTMLDialogElement>(null);
   const feed = useCivilAlerts();
+  const droneFeed = useDroneThreats();
   const region = feed.alerts.find(item => item.regionId === location?.regionId);
-  const notifications = useRegionalNotifications(location?.regionId, location?.name, region?.level);
+  const notifications = useMonitoringNotifications(feed, droneFeed, location, preferences);
   const choosing = !location || editing;
+  const legalPage = hash === '#privacy' ? 'privacy' : hash === '#disclaimer' ? 'disclaimer' : null;
+  const checkedAt = [feed.checkedAt, droneFeed.checkedAt].filter((value): value is string => !!value)
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+  const connected = feed.status === 'ready' || feed.status === 'limited' || droneFeed.status === 'ready';
+
+  useEffect(() => {
+    const listener = () => setHash(window.location.hash);
+    window.addEventListener('hashchange', listener);
+    return () => window.removeEventListener('hashchange', listener);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = preferences.theme;
+  }, [preferences.theme]);
+
+  useEffect(() => {
+    if (legalPage) window.scrollTo({ top: 0, behavior: 'instant' });
+    else if (hash === '#radar' || hash === '#threats' || hash === '#onboarding') {
+      document.getElementById(hash.slice(1))?.scrollIntoView();
+    }
+  }, [hash, legalPage]);
+
+  function updatePreferences(next: MonitoringPreferences) {
+    setPreferences(next);
+    saveMonitoringPreferences(next);
+  }
+
+  function openFeed(view: 'active' | 'changes') {
+    if (choosing || legalPage) {
+      if (choosing) window.location.hash = '#onboarding';
+      else window.location.hash = '#radar';
+    }
+    setFeedView(view);
+    setFeedOpen(true);
+  }
 
   function saveLocation(next: Location) {
     setLocation(next);
@@ -132,7 +143,7 @@ export function Dashboard() {
       <div className="site-header-inner">
         <a href="#main" className="brand" aria-label="KYIV ALERT · На початок">
           <span className="brand-mark"><RadarIcon size={23} aria-hidden="true" /></span>
-          <span>KYIV <strong>ALERT</strong></span>
+          <span>KYIV <strong>ALERT</strong><small>LIVE THREAT MONITORING</small></span>
         </a>
         <div className="header-actions">
           <a className="national-link" href="https://map.ukrainealarm.com/" target="_blank" rel="noreferrer">
@@ -141,16 +152,43 @@ export function Dashboard() {
           <button type="button" className="inbox-button" onClick={() => messages.current?.showModal()}>
             <MessageSquareText size={17} aria-hidden="true" /> <span>Повідомлення</span>
           </button>
-          {location && !editing && <button type="button" className="inbox-button header-feed"
-            onClick={() => setFeedOpen(true)} aria-haspopup="dialog">
-            <PanelRightOpen size={17} aria-hidden="true" /> <span>Стрічка тривог</span>
-          </button>}
-          {location && <button type="button" className="location-chip" onClick={changeLocation} aria-expanded={editing}>
+          <button type="button" className="theme-toggle" aria-label={preferences.theme === 'dark' ? 'Світла тема' : 'Темна тема'}
+            onClick={() => updatePreferences({ ...preferences, theme: preferences.theme === 'dark' ? 'light' : 'dark' })}>
+            {preferences.theme === 'dark' ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+          </button>
+          {location && !legalPage && <button type="button" className="location-chip" onClick={changeLocation} aria-expanded={editing}>
             <MapPin size={16} aria-hidden="true" /> <span>{location.name}</span> <ChevronDown size={15} aria-hidden="true" />
           </button>}
         </div>
       </div>
+      <div className="monitoring-header-row">
+        <nav aria-label="Навігація радара">
+          <a href={choosing ? '#onboarding' : '#radar'}>Карта</a>
+          <a href={choosing ? '#onboarding' : '#threats'}>Загрози</a>
+          <button type="button" onClick={() => openFeed('active')}>Повітряні тривоги</button>
+          <button type="button" aria-haspopup="dialog" onClick={() => sources.current?.showModal()}>Джерела</button>
+          <button type="button" onClick={() => openFeed('changes')}>Історія</button>
+          <button type="button" aria-haspopup="dialog" onClick={() => settings.current?.showModal()}>Налаштування</button>
+        </nav>
+        <span className="sync-indicator" data-connected={connected}>
+          <span aria-hidden="true" />
+          {!connected && checkedAt && 'Зв’язок недоступний · '}
+          {checkedAt ? <>Остання синхронізація · <time dateTime={checkedAt}>{kyivTime.format(new Date(checkedAt))}</time></> : 'Синхронізацію ще не виконано'}
+        </span>
+      </div>
     </header>
+    <MonitoringSettings dialog={settings} preferences={preferences} update={updatePreferences}
+      permission={notifications.permission} enable={notifications.enable} />
+    <dialog ref={sources} className="panel message-dialog monitor-dialog" aria-labelledby="sources-title">
+      <div className="dialog-title"><h2 id="sources-title">Джерела</h2>
+        <form method="dialog"><button type="submit" aria-label="Закрити джерела"><X size={21} aria-hidden="true" /></button></form>
+      </div>
+      <ul className="source-list">
+        <li><strong>Офіційні оголошення Києва й області</strong><p>Telegram · регіональні попередження про загрозу БпЛА.</p></li>
+        <li><strong>Загальноукраїнський потік</strong><p>Поточні цивільні тривоги по областях і районах, де доступні дані.</p></li>
+      </ul>
+      <a className="dialog-link" href={officialMap} target="_blank" rel="noreferrer">Офіційна мапа повітряних тривог</a>
+    </dialog>
     <dialog ref={messages} className="panel message-dialog" aria-labelledby="messages-title">
       <div className="dialog-title">
         <h2 id="messages-title"><MessageSquareText size={21} aria-hidden="true" /> Повідомлення</h2>
@@ -169,8 +207,8 @@ export function Dashboard() {
         Офіційна мапа повітряних тривог <ArrowUpRight size={15} aria-hidden="true" />
       </a>
     </dialog>
-    <main className="site-main" id="main">
-      <section className={'hero' + (choosing ? ' hero-onboarding' : '')}>
+    {legalPage ? <Legal page={legalPage} /> : <main className="site-main" id="main">
+      <section id="onboarding" className={'hero' + (choosing ? ' hero-onboarding' : '')}>
         <div className="hero-photo" aria-hidden="true" />
         <div className="hero-copy">
           <p className="eyebrow"><span className="hero-pip" /> Україна · Цивільні сповіщення</p>
@@ -194,13 +232,16 @@ export function Dashboard() {
           </div>
           <a href="https://map.ukrainealarm.com/" target="_blank" rel="noreferrer">Офіційна мапа тривог</a>
         </aside>
-        <CivilAlertsPanel feed={feed} location={location} notifications={notifications.permission} enableNotifications={notifications.enable} />
-        <Radar feed={feed} location={location} feedOpen={feedOpen} onFeedOpenChange={setFeedOpen} />
+        <CivilAlertsPanel feed={feed} location={location} notifications={preferences.notifications ? notifications.permission : 'off'} enableNotifications={notifications.enable} />
+        <Radar feed={feed} droneFeed={droneFeed} location={location} feedOpen={feedOpen} feedView={feedView}
+          setFeedView={setFeedView} onFeedOpenChange={setFeedOpen} />
       </section>}
-    </main>
+    </main>}
     <footer className="site-footer">
       <span>KYIV ALERT</span>
       <a href="https://map.ukrainealarm.com/" target="_blank" rel="noreferrer">Офіційна мапа <ArrowUpRight size={14} aria-hidden="true" /></a>
+      <a href="#privacy">Політика конфіденційності</a>
+      <a href="#disclaimer">Відмова від відповідальності</a>
       <span><BellRing size={15} aria-hidden="true" /> Інформаційні дані · <a href="https://tryvoha.online/api" target="_blank" rel="noreferrer">Tryvoha.online</a></span>
     </footer>
   </>;
