@@ -162,7 +162,11 @@ public sealed class CivilAlertsMonitor(
             try
             {
                 var resolved = await client.Contacts_ResolveUsername(username).WaitAsync(RequestTimeout, stoppingToken);
-                if (resolved.Channel is { } channel) resolvedChannels.Add((username, channel));
+                if (resolved.Channel is { } channel)
+                {
+                    resolvedChannels.Add((username, channel));
+                    logger.LogInformation("Monitoring source {Channel} connected.", username);
+                }
                 else logger.LogWarning("Monitoring source {Channel} is not a public channel.", username);
             }
             catch (Exception error) when (!stoppingToken.IsCancellationRequested)
@@ -190,9 +194,10 @@ public sealed class CivilAlertsMonitor(
                 foreach (var message in latest.Messages.OfType<Message>())
                 {
                     if (message.fwd_from is not null || message.date < cutoff || message.date > now) continue;
-                    if (MonitoringPostParser.Parse(username, message.id, new DateTimeOffset(message.date), message.message)
-                        is { } signal) signals.Add(signal);
+                    signals.AddRange(MonitoringPostParser.Parse(
+                        username, message.id, new DateTimeOffset(message.date), message.message));
                 }
+                logger.LogInformation("Monitoring source {Channel} read successfully.", username);
             }
             catch (Exception error) when (!stoppingToken.IsCancellationRequested)
             {
