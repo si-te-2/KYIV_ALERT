@@ -25,6 +25,9 @@ public sealed class DroneWarningTests
     [InlineData("unknown", "🔴 м. Київ — повітряна тривога через загрозу БпЛА")]
     [InlineData("VA_Kyiv", "🟡 Жовтий рівень небезпеки\nОголошено повітряну тривогу, але загрози БпЛА немає.")]
     [InlineData("VA_Kyiv", "🔴 м. Київ — повітряна тривога.\nУ дописі процитовано згадку про Shahed.")]
+    [InlineData("VA_Kyiv", "шахед на Вишгород")]
+    [InlineData("kyivoda", "БпЛА з Броварів курсом на Київ")]
+    [InlineData("VA_Kyiv", "🔴 м. Київ — повітряна тривога.\nПовідомляють: «шахед на Вишгород».")]
     [InlineData("kyivoda", "🟡 Бучанський район — повітряна тривога через загрозу БпЛА")]
     [InlineData("kyivoda", "Неперевірена згадка про БпЛА.")]
     public void DoesNotConvertAmbiguousOrSubregionalTextIntoWarnings(string source, string text) =>
