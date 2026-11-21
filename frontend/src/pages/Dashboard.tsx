@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, BellRing, ChevronDown, MapPin, MessageSquareText, PanelRightOpen, X, Radar as RadarIcon, Waves } from 'lucide-react';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, BellRing, ChevronDown, Info, MapPin, MessageSquareText, PanelRightOpen, X, Radar as RadarIcon, Waves } from 'lucide-react';
 import { CivilAlertsPanel } from '../components/CivilAlertsPanel';
 import { alertLabels, isActive, statusLabel, useCivilAlerts, type AlertLevel } from '../hooks/useCivilAlerts';
 import { cityOptions, districtOptions, findLocation, mapAreas, mapDistricts, oblastOptions, type Location } from '../services/locations';
@@ -185,6 +185,15 @@ export function Dashboard() {
       </section>
 
       {location && !editing && <section id="radar" ref={radar} tabIndex={-1} className="radar-section">
+        <aside className="radar-notice" aria-labelledby="radar-notice-title">
+          <span className="radar-notice-icon"><Info size={19} aria-hidden="true" /></span>
+          <div>
+            <h2 id="radar-notice-title">Інформаційний радар тривог</h2>
+            <p>Дані можуть надходити із затримкою або містити помилки. Звіряйте статус з офіційними сповіщеннями.
+              Під час тривоги залишайтеся в укритті до офіційного відбою.</p>
+          </div>
+          <a href="https://map.ukrainealarm.com/" target="_blank" rel="noreferrer">Офіційна мапа тривог</a>
+        </aside>
         <CivilAlertsPanel feed={feed} location={location} notifications={notifications.permission} enableNotifications={notifications.enable} />
         <Radar feed={feed} location={location} feedOpen={feedOpen} onFeedOpenChange={setFeedOpen} />
       </section>}
