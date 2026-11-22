@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDownRight, ArrowRight, ArrowUpRight, BellRing, ChevronDown, Info, MapPin, MessageSquareText, Moon, Sun, X, Radar as RadarIcon, Waves } from 'lucide-react';
+import { ArrowDownRight, ArrowRight, ArrowUpRight, BellRing, ChevronDown, MapPin, MessageSquareText, Moon, Sun, X, Radar as RadarIcon, Waves } from 'lucide-react';
 import { CivilAlertsPanel } from '../components/CivilAlertsPanel';
 import { MonitoringSettings } from '../components/MonitoringSettings';
 import { isActive, statusLabel, useCivilAlerts } from '../hooks/useCivilAlerts';
@@ -211,8 +211,7 @@ export function Dashboard() {
       <section id="onboarding" className={'hero' + (choosing ? ' hero-onboarding' : '')}>
         <div className="hero-photo" aria-hidden="true" />
         <div className="hero-copy">
-          <p className="eyebrow"><span className="hero-pip" /> Україна · Цивільні сповіщення</p>
-          <h1>Радар<br />тривог<span>.</span></h1>
+          <h1>Радар<br />тривог</h1>
           <p className="hero-description">Стежте за повітряними тривогами в Україні та отримуйте сповіщення для свого регіону.</p>
           {location && !editing && <a href="#radar" className="secondary-button"><ArrowDownRight size={18} aria-hidden="true" /> До карти</a>}
         </div>
@@ -223,15 +222,6 @@ export function Dashboard() {
       </section>
 
       {location && !editing && <section id="radar" ref={radar} tabIndex={-1} className="radar-section">
-        <aside className="radar-notice" aria-labelledby="radar-notice-title">
-          <span className="radar-notice-icon"><Info size={19} aria-hidden="true" /></span>
-          <div>
-            <h2 id="radar-notice-title">Інформаційний радар тривог</h2>
-            <p>Дані можуть надходити із затримкою або містити помилки. Звіряйте статус з офіційними сповіщеннями.
-              Під час тривоги залишайтеся в укритті до офіційного відбою.</p>
-          </div>
-          <a href="https://map.ukrainealarm.com/" target="_blank" rel="noreferrer">Офіційна мапа тривог</a>
-        </aside>
         <CivilAlertsPanel feed={feed} location={location} notifications={preferences.notifications ? notifications.permission : 'off'} enableNotifications={notifications.enable} />
         <Radar feed={feed} droneFeed={droneFeed} location={location} feedOpen={feedOpen} feedView={feedView}
           setFeedView={setFeedView} onFeedOpenChange={setFeedOpen} />

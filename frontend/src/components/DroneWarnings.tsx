@@ -1,7 +1,7 @@
 import { Radio, TriangleAlert } from 'lucide-react';
 import type { DroneFeed, DroneWarning } from '../hooks/useDroneThreats';
 import { mapRegions } from '../services/locations';
-import { credibilityLabels, droneNotice, kyivTime, officialMap, threatLabels } from '../services/monitoring';
+import { credibilityLabels, kyivTime, officialMap, threatLabels } from '../services/monitoring';
 
 const areaNames = new Map(mapRegions.map(area => [area.id, area.name]));
 const sourceLabels = { ready: 'Потік оновлюється', connecting: 'Підключення до джерела',
@@ -30,13 +30,11 @@ export function WarningDetails({ warning }: { warning: DroneWarning }) {
   </div>;
 }
 
-export function DroneWarnings({ feed, warnings, shahedOnly, onFilter, onSelect }: {
+export function DroneWarnings({ feed, onSelect }: {
   feed: DroneFeed;
-  warnings: DroneWarning[];
-  shahedOnly: boolean;
-  onFilter: (shahedOnly: boolean) => void;
   onSelect: (warning: DroneWarning) => void;
 }) {
+  const warnings = feed.warnings;
   const sections = [
     { name: 'Дійсні попередження', entries: warnings.filter(warning => warning.status === 'CONFIRMED') },
     { name: 'Потребують перевірки', entries: warnings.filter(warning => warning.status !== 'CONFIRMED') },
@@ -44,11 +42,6 @@ export function DroneWarnings({ feed, warnings, shahedOnly, onFilter, onSelect }
   return <section className="panel threat-panel" id="threats" aria-labelledby="threats-title">
     <p className="eyebrow"><Radio size={16} aria-hidden="true" /> DRONE THREAT RADAR</p>
     <h2 id="threats-title">Регіональні попередження</h2>
-    <p className="threat-caution">{droneNotice}.</p>
-    <div className="threat-filters" role="group" aria-label="Тип загрози БпЛА">
-      <button type="button" aria-pressed={!shahedOnly} onClick={() => onFilter(false)}>Усі БпЛА</button>
-      <button type="button" aria-pressed={shahedOnly} onClick={() => onFilter(true)}><ShahedIcon /> Лише Shahed</button>
-    </div>
     <p className="threat-source-state" role="status"><TriangleAlert size={16} aria-hidden="true" />{sourceLabels[feed.status]}</p>
     {feed.checkedAt && <p className="threat-time">Остання синхронізація · <time dateTime={feed.checkedAt}>{kyivTime.format(new Date(feed.checkedAt))}</time></p>}
     {sections.map(section => section.entries.length > 0 && <div key={section.name} className="threat-group">

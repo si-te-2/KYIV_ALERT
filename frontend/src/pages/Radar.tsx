@@ -46,7 +46,6 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
   const [districts, setDistricts] = useState(true);
   const [showCivil, setShowCivil] = useState(true);
   const [showDrone, setShowDrone] = useState(true);
-  const [shahedOnly, setShahedOnly] = useState(false);
   const [selectedWarning, setSelectedWarning] = useState<string>();
   const [size, setSize] = useState({ width: 0, height: 0 });
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -57,8 +56,7 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
   const lastCamera = useRef(camera);
   const shapes = useMemo(() => new Map(mapAreas.map(area => [area.id, new Path2D(area.path)])), []);
   const inExercise = exercise === 'active';
-  const visibleWarnings = shahedOnly ? droneFeed.warnings.filter(entry => entry.kind === 'SHAHED') : droneFeed.warnings;
-  const warning = visibleWarnings.find(entry => entry.regionId === selectedWarning);
+  const warning = droneFeed.warnings.find(entry => entry.regionId === selectedWarning);
   const activeArea = findArea(selected);
   const levels = useMemo(() => new Map(feed.alerts.map(alert => [alert.regionId, alert])), [feed.alerts]);
 
@@ -255,7 +253,7 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
   }) : [];
 
   const warningMarkers = size.width && showDrone && !inExercise && droneFeed.status === 'ready'
-    ? separateRegionMarkers(visibleWarnings.flatMap(entry => {
+    ? separateRegionMarkers(droneFeed.warnings.flatMap(entry => {
       const area = mapRegions.find(area => area.id === entry.regionId);
       if (!area || (entry.status !== 'CONFIRMED' && entry.status !== 'UNVERIFIED')) return [];
       const point = toScreen(camera, size, area);
@@ -336,11 +334,7 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
       </div>
     </section>
     <div className="radar-sidebar">
-    <DroneWarnings feed={droneFeed} warnings={visibleWarnings} shahedOnly={shahedOnly} onSelect={selectWarning}
-      onFilter={only => {
-        setShahedOnly(only);
-        setSelectedWarning(undefined);
-      }} />
+    <DroneWarnings feed={droneFeed} onSelect={selectWarning} />
     <section className="panel region-panel">
       <h2>Вибір території</h2>
       <label htmlFor="radar-region">Область, місто або район</label>
