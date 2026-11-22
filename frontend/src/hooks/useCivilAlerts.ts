@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { staticSite } from '../services/runtime';
+import { parsePublicCivilFeed } from '../services/publicCivilFeed';
 
 export type AlertLevel = 'active' | 'warning' | 'partial' | 'ended' | 'clear' | 'none';
 
@@ -32,29 +34,36 @@ const initial: Feed = { status: 'connecting', checkedAt: null, alerts: [] };
 const onCivilFailure = (previous: Feed): Feed => ({ ...previous, status: 'unavailable', alerts: [] });
 
 export function useCivilAlerts() {
-  return usePollingFeed('/api/civil-alerts', initial, onCivilFailure);
+  return usePollingFeed(staticSite ? 'https://tryvoha.online/api/v1/alerts' : '/api/civil-alerts',
+    initial, onCivilFailure, staticSite ? parsePublicCivilFeed : undefined);
 }
 
-export function usePollingFeed<T>(url: string, initialFeed: T, onFailure: (previous: T) => T) {
+export function usePollingFeed<T>(
+  url: string | null, initialFeed: T, onFailure: (previous: T) => T,
+  decode?: (value: unknown) => T,
+) {
   const [feed, setFeed] = useState(initialFeed);
 
   useEffect(() => {
+    if (!url) return;
+    const feedUrl = url;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
 
     async function refresh() {
       try {
-        const response = await fetch(url, {
+        const response = await fetch(feedUrl, {
           cache: 'no-store',
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),
         });
         if (!response.ok) throw new Error('Regional alerts unavailable.');
-        const next = await response.json() as T;
+        const payload = await response.json();
+        const next = decode ? decode(payload) : payload as T;
         if (!controller.signal.aborted) setFeed(next);
       } catch {
         if (!controller.signal.aborted) setFeed(onFailure);
       } finally {
-        if (!controller.signal.aborted) timer = setTimeout(refresh, 10000);
+        if (!controller.signal.aborted) timer = setTimeout(refresh, staticSite ? 45000 : 10000);
       }
     }
 
@@ -63,7 +72,7 @@ export function usePollingFeed<T>(url: string, initialFeed: T, onFailure: (previ
       controller.abort();
       clearTimeout(timer);
     };
-  }, [url, onFailure]);
+  }, [url, onFailure, decode]);
 
   return feed;
 }

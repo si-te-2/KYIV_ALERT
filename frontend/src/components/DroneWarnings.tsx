@@ -2,10 +2,12 @@ import { Radio, TriangleAlert } from 'lucide-react';
 import type { DroneFeed, DroneWarning } from '../hooks/useDroneThreats';
 import { mapRegions } from '../services/locations';
 import { credibilityLabels, kyivTime, officialMap, threatLabels } from '../services/monitoring';
+import { staticSite } from '../services/runtime';
 
 const areaNames = new Map(mapRegions.map(area => [area.id, area.name]));
 const sourceLabels = { ready: 'Потік оновлюється', connecting: 'Підключення до джерела',
-  unavailable: 'Зв’язок із джерелом втрачено', disabled: 'Telegram-моніторинг вимкнено' };
+  unavailable: 'Зв’язок із джерелом втрачено',
+  disabled: staticSite ? 'Telegram-потік доступний у локальній версії' : 'Telegram-моніторинг вимкнено' };
 const sourceNames: Record<string, string> = {
   'UA-30': 'Київська міська військова адміністрація',
   'UA-32': 'Київська обласна військова адміністрація',
@@ -57,7 +59,7 @@ export function DroneWarnings({ feed, onSelect }: {
         </button>
       </li>)}</ul>
     </div>)}
-    {!warnings.length && feed.status !== 'ready' &&
+    {!warnings.length && feed.status !== 'ready' && feed.status !== 'disabled' &&
       <p className="threat-empty">Актуальні попередження з Telegram недоступні.</p>}
     <a className="threat-official" href={officialMap} target="_blank" rel="noreferrer">Звірити стан повітряної тривоги</a>
   </section>;
