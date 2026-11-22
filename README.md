@@ -4,11 +4,11 @@
 
 ## Публічний сайт
 
-[Відкрити KYIV ALERT](https://si-te-2.github.io/KYIV_ALERT/). GitHub Pages публікує інтерфейс із гілки `main` через GitHub Actions. Загальні стани повітряних тривог отримуються з відкритого API Tryvoha.online кожні 45 секунд. Telegram-моніторинг працює в серверній локальній версії.
+[Відкрити KYIV ALERT](https://si-te-2.github.io/KYIV_ALERT/). GitHub Pages публікує інтерфейс із гілки `main` через GitHub Actions. Загальні стани повітряних тривог отримуються з відкритого API Tryvoha.online кожні 45 секунд. Telegram-моніторинг працює на C#-сервері [kyiv-alert-api.onrender.com](https://kyiv-alert-api.onrender.com/api/health) у Render Free та повертає лише регіональні попередження. Вимкнення комп’ютера оператора не зупиняє цей сервер.
 
 Для перевірки публічної збірки задайте `VITE_STATIC_SITE=true` і виконайте `npm run build -- --base=/KYIV_ALERT/` у каталозі `frontend`. Звичайна локальна збірка продовжує використовувати API ASP.NET Core.
 
-Підготовлено [розгортання C# API на Render Free](docs/public-backend.md): Dockerfile, конфігурацію без секретів, CORS для GitHub Pages і підключення віддаленого API через змінну репозиторію `PUBLIC_API_ORIGIN`. Саме додавання цих файлів не запускає Telegram у хмарі: потрібні обліковий запис хостингу й окремо погоджене перенесення приватної сесії. Поки адресу API не задано, сайт працює як раніше.
+[Налаштування C# API на Render Free](docs/public-backend.md): Dockerfile, конфігурація без секретів, CORS для GitHub Pages і змінна репозиторію `PUBLIC_API_ORIGIN`. Приватну Telegram-сесію перенесено лише після окремої згоди власника; локальний читач зупинено. Render Free засинає без відвідувачів, тому після простою можливі затримки пробудження. Безперервний моніторинг не гарантується.
 
 ## Запуск
 

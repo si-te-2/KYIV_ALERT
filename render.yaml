@@ -1,4 +1,4 @@
-# Starts without Telegram credentials. Enable only after approving private session transfer.
+# Telegram session transfer was approved by the owner. Credentials remain only in Render.
 services:
   - type: web
     name: kyiv-alert-api
@@ -17,8 +17,10 @@ services:
       - key: CivilAlerts__PublicFeed
         value: 'true'
       - key: CivilAlerts__Enabled
-        value: 'false'
+        value: 'true'
       - key: CivilAlerts__MonitoringChannels
         value: kyiv_nebo,ppo_kiev,tlknewsua,nebo_raketa,smolii_ukraine,StrategicaviationT,ukraine_pyxx,kpszsu,war_monitor
       - key: Telegram__SessionDirectory
         value: /tmp/kyiv-alert-telegram
+      - key: Telegram__SessionSeedFile
+        value: /etc/secrets/telegram-session.base64
