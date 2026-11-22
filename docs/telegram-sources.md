@@ -1,16 +1,19 @@
 # Джерела Telegram
 
-| Канал | Доступ бота |
+| Канал | Локальне читання через Telegram-сесію |
 | --- | --- |
-| [@ukraine_pyxx](https://t.me/ukraine_pyxx) | Очікує доступу |
-| [@smolii_ukraine](https://t.me/smolii_ukraine) | Очікує доступу |
-| [@kyiv_nebo](https://t.me/kyiv_nebo) | Очікує доступу |
-| [@StrategicaviationT](https://t.me/StrategicaviationT) | Очікує доступу |
-| [@kpszsu](https://t.me/kpszsu) | Очікує доступу |
-| [@ppo_kiev](https://t.me/ppo_kiev) | Очікує перевірки каналу й доступу |
-| [@kievinfo_kyiv](https://t.me/kievinfo_kyiv) | Очікує доступу |
+| [@tlknewsua](https://t.me/tlknewsua) | Успішно перевірено |
+| [@nebo_raketa](https://t.me/nebo_raketa) | Успішно перевірено |
+| [@smolii_ukraine](https://t.me/smolii_ukraine) | Успішно перевірено |
+| [@StrategicaviationT](https://t.me/StrategicaviationT) | Успішно перевірено |
+| [@ukraine_pyxx](https://t.me/ukraine_pyxx) | Успішно перевірено |
+| [@kpszsu](https://t.me/kpszsu) | Успішно перевірено |
+| [@kyiv_nebo](https://t.me/kyiv_nebo) | Успішно перевірено |
+| [@war_monitor](https://t.me/war_monitor) | Успішно перевірено |
+| [@ppo_kiev](https://t.me/ppo_kiev) | Успішно перевірено, попереднє підключення збережено |
+| [@kievinfo_kyiv](https://t.me/kievinfo_kyiv) | Раніше запропонований канал, до поточної конфігурації не включений |
 
-Список містить запропоновані джерела. Поточний шар цивільних попереджень про БпЛА використовує офіційні оголошення Києва й Київської області через локальну сесію Telegram.
+Читання дев’яти підключених каналів перевірено 22 листопада 2026 року. Додаткові повідомлення мають статус `UNVERIFIED`. Окремий офіційний потік Києва й Київської області продовжує працювати через ту саму локальну сесію Telegram.
 
 ## Додаткові цивільні попередження
 
@@ -20,7 +23,7 @@
 
 Попередження має пунктирну позначку зі статусом «Потребує перевірки» та посилання на оголошення. Воно зникає через 30 хвилин, після нового офіційного відбою або за втрати з’єднання з офіційним потоком. Підтверджене офіційне оголошення має пріоритет. Браузерні сповіщення з цього шару не надсилаються.
 
-Для двох раніше запропонованих джерел можна задати `CivilAlerts:MonitoringChannels=kyiv_nebo,ppo_kiev`. Параметр зберігайте в локальних user-secrets або змінних середовища. Результат аналізу ключових слів може бути помилковим. Час у картці означає час допису.
+Поточний перелік можна відтворити параметром `CivilAlerts:MonitoringChannels=kyiv_nebo,ppo_kiev,tlknewsua,nebo_raketa,smolii_ukraine,StrategicaviationT,ukraine_pyxx,kpszsu,war_monitor`. Параметр зберігайте в локальних user-secrets або змінних середовища. Результат аналізу ключових слів може бути помилковим. Час у картці означає час допису.
 
 ## Telegram Bot API
 

@@ -294,7 +294,7 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
       <div className="map-surface" ref={mapSurface}>
         <canvas ref={canvas} onPointerDown={startDrag} onPointerMove={drag}
           onPointerCancel={finishDrag} onPointerUp={finishDrag} onLostPointerCapture={finishDrag} onKeyDown={panFromKeyboard}
-          tabIndex={0} aria-label="Інтерактивна карта" aria-describedby="map-navigation-hint" />
+          tabIndex={0} aria-label="Інтерактивна карта" />
         {mapMarkers.map(marker => <button key={marker.id} type="button" className={`map-pulse ${marker.level}`}
           style={{ left: marker.left, top: marker.top }} aria-label={`Оголошення: ${marker.name}`}
           aria-pressed={selected === marker.id} onClick={() => selectRegion(marker.id)} />)}
@@ -324,13 +324,10 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
           {selectedAlert?.publishedAt ? 'Оголошено' : 'Оновлено'} {mapTime.format(new Date(eventTime))}
         </time>}
       </div>
-      <p className="map-navigation-hint" id="map-navigation-hint">Перетягуйте карту або використовуйте стрілки. Масштаб · Ctrl + колесо або жест двома пальцями.</p>
       <div className="map-footer">
         <span><i className="legend-swatch" /> {inExercise ? 'Тестова тривога' : 'Тривога'}</span>
         {!inExercise && <><span><i className="legend-swatch warning" /> Жовтий рівень</span>
           <span><i className="legend-swatch partial" /> Часткова тривога</span></>}
-        {!inExercise && showDrone && <span className="shahed-legend"><ShahedIcon /> Загроза Shahed</span>}
-        <span className="map-attribution"><a href="https://data.humdata.org/dataset/cod-ab-ukr" target="_blank" rel="noreferrer">Межі © OCHA / HDX</a></span>
       </div>
     </section>
     <div className="radar-sidebar">

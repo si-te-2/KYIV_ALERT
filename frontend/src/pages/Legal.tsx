@@ -23,6 +23,10 @@ export function Legal({ page }: { page: 'privacy' | 'disclaimer' }) {
       <h2>Дії під час тривоги</h2>
       <p>Дотримуйтеся офіційних сигналів та вказівок місцевої влади й служб. Під час повітряної тривоги перейдіть до укриття та залишайтеся там до офіційного відбою. Сповіщення браузера залежать від дозволів, з’єднання та роботи відкритої сторінки.</p>
       <a className="secondary-button" href={officialMap} target="_blank" rel="noreferrer">Офіційна мапа повітряних тривог</a>
+      <h2>Дані карти</h2>
+      <p>Адміністративні межі © OCHA / HDX, Ukraine COD-AB v05. Для цієї карти полігони об’єднано,
+        спрощено й перепроєктовано. <a className="dialog-link" href="https://data.humdata.org/dataset/cod-ab-ukr" target="_blank" rel="noreferrer">Джерело даних</a>{' · '}
+        <a className="dialog-link" href="https://creativecommons.org/licenses/by/3.0/igo/" target="_blank" rel="noreferrer">Ліцензія CC BY 3.0 IGO</a>.</p>
     </article>}
   </main>;
 }

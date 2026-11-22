@@ -57,10 +57,8 @@ export function DroneWarnings({ feed, onSelect }: {
         </button>
       </li>)}</ul>
     </div>)}
-    {!warnings.length && <p className="threat-empty">{feed.status === 'ready'
-      ? 'У підключених джерелах зараз немає окремих попереджень цього типу.'
-      : 'Актуальні попередження з Telegram недоступні.'}</p>}
-    <p className="threat-coverage">Покриття Telegram · Київ і Київська область</p>
+    {!warnings.length && feed.status !== 'ready' &&
+      <p className="threat-empty">Актуальні попередження з Telegram недоступні.</p>}
     <a className="threat-official" href={officialMap} target="_blank" rel="noreferrer">Звірити стан повітряної тривоги</a>
   </section>;
 }
