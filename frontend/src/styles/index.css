@@ -1,8 +1,25 @@
 @import 'tailwindcss';
 
+@font-face {
+  font-family: 'Manrope'; font-style: normal; font-weight: 400 800; font-display: swap;
+  src: url('../assets/fonts/manrope-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Manrope'; font-style: normal; font-weight: 400 800; font-display: swap;
+  src: url('../assets/fonts/manrope-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Manrope'; font-style: normal; font-weight: 400 800; font-display: swap;
+  src: url('../assets/fonts/manrope-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
   color-scheme: dark;
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-family: 'Manrope', "Segoe UI", system-ui, sans-serif;
+  font-weight: 550;
   color: #f5f1ff;
   background: #0b0e1b;
   font-synthesis: none;
@@ -23,7 +40,9 @@ body {
   overflow-x: hidden;
   background: radial-gradient(ellipse at 55% 0%, #24204a 0%, transparent 42rem), #0b0e1b;
 }
-button, select { font: inherit; }
+button, select, input { font: inherit; }
+button, select { font-weight: 650; }
+strong { font-weight: 800; }
 button { cursor: pointer; }
 button:disabled { cursor: default; }
 button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid #e3d5ff; outline-offset: 4px; }
@@ -36,7 +55,7 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid
 .brand, .header-actions, .location-chip, .national-link {
   display: inline-flex; align-items: center; gap: 9px;
 }
-.brand { gap: 12px; font-weight: 850; letter-spacing: .02em; white-space: nowrap; }
+.brand { gap: 12px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
 .brand strong { color: var(--accent); }
 .brand-mark {
   display: grid; place-items: center; width: 39px; height: 39px; border-radius: 12px;
@@ -77,7 +96,7 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid
 }
 .hero h1 {
   margin: 12px 0 17px; color: #fff; font-weight: 800; line-height: .94;
-  font-size: clamp(3.4rem, 8.2vw, 7.5rem); letter-spacing: -.075em;
+  font-size: clamp(3.4rem, 8.2vw, 7.5rem); letter-spacing: -.045em;
 }
 .hero-description { max-width: 33ch; color: #e5e0f4; font-size: clamp(.95rem, 2.25vw, 1.14rem); line-height: 1.6; }
 .hero-copy > .secondary-button { margin-top: 20px; background: #251e42ae; }
@@ -94,7 +113,7 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid
   display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px;
   border: 1px solid #726194; border-radius: 12px; background: #342a51; color: #d8c7ff;
 }
-h2, h3 { font-weight: 750; }
+h2, h3 { font-weight: 800; }
 h2 { font-size: 1.15rem; letter-spacing: -.017em; }
 h3 { font-size: .97rem; }
 .location-form-heading p, .location-note, .regional-summary > p:last-child, .notification-settings p, .exercise-panel p {
@@ -324,7 +343,7 @@ select { width: 100%; border: 1px solid #51466b; border-radius: 9px; background:
 .monitoring-header-row nav :is(a, button), .theme-toggle {
   display: inline-flex; align-items: center; min-height: 35px; padding: 6px 9px; border-radius: 8px; color: var(--text);
 }
-.monitoring-header-row nav :is(a, button) { font-size: .875rem; }
+.monitoring-header-row nav :is(a, button) { font-size: .875rem; font-weight: 750; }
 .monitoring-header-row nav :is(a, button):hover, .theme-toggle:hover { background: #8171ac33; }
 .theme-toggle { justify-content: center; min-width: 35px; border: 1px solid var(--border); }
 .sync-indicator { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .78rem; }
@@ -383,8 +402,6 @@ select { width: 100%; border: 1px solid #51466b; border-radius: 9px; background:
 .warning-details p { color: #dacfea; font-size: .84rem; }
 .warning-details a { color: #e5d4ff; }
 .monitor-dialog { max-height: min(82dvh, 700px); overflow-y: auto; }
-.source-list { display: grid; gap: 12px; margin: 14px 0; }
-.source-list p { font-size: .875rem; }
 .settings-opt-in { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
 .settings-regions { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 6px 10px; margin-top: 12px; }
 .settings-regions legend { margin-bottom: 9px; font-weight: 700; }

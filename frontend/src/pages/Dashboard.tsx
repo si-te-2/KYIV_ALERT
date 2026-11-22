@@ -6,7 +6,7 @@ import { isActive, statusLabel, useCivilAlerts } from '../hooks/useCivilAlerts';
 import { useDroneThreats } from '../hooks/useDroneThreats';
 import { useMonitoringNotifications } from '../hooks/useMonitoringNotifications';
 import { cityOptions, districtOptions, findLocation, mapAreas, mapDistricts, oblastOptions, type Location } from '../services/locations';
-import { kyivTime, officialMap } from '../services/monitoring';
+import { kyivTime } from '../services/monitoring';
 import { locationKey, readMonitoringPreferences, saveMonitoringPreferences, type MonitoringPreferences } from '../services/monitoringPreferences';
 import { Legal } from './Legal';
 import { Radar } from './Radar';
@@ -78,7 +78,6 @@ export function Dashboard() {
   const radar = useRef<HTMLElement>(null);
   const locationPicker = useRef<HTMLDivElement>(null);
   const messages = useRef<HTMLDialogElement>(null);
-  const sources = useRef<HTMLDialogElement>(null);
   const settings = useRef<HTMLDialogElement>(null);
   const feed = useCivilAlerts();
   const droneFeed = useDroneThreats();
@@ -164,10 +163,7 @@ export function Dashboard() {
       <div className="monitoring-header-row">
         <nav aria-label="Навігація радара">
           <a href={choosing ? '#onboarding' : '#radar'}>Карта</a>
-          <a href={choosing ? '#onboarding' : '#threats'}>Загрози</a>
           <button type="button" onClick={() => openFeed('active')}>Повітряні тривоги</button>
-          <button type="button" aria-haspopup="dialog" onClick={() => sources.current?.showModal()}>Джерела</button>
-          <button type="button" onClick={() => openFeed('changes')}>Історія</button>
           <button type="button" aria-haspopup="dialog" onClick={() => settings.current?.showModal()}>Налаштування</button>
         </nav>
         <span className="sync-indicator" data-connected={connected}>
@@ -179,16 +175,6 @@ export function Dashboard() {
     </header>
     <MonitoringSettings dialog={settings} preferences={preferences} update={updatePreferences}
       permission={notifications.permission} enable={notifications.enable} />
-    <dialog ref={sources} className="panel message-dialog monitor-dialog" aria-labelledby="sources-title">
-      <div className="dialog-title"><h2 id="sources-title">Джерела</h2>
-        <form method="dialog"><button type="submit" aria-label="Закрити джерела"><X size={21} aria-hidden="true" /></button></form>
-      </div>
-      <ul className="source-list">
-        <li><strong>Офіційні оголошення Києва й області</strong><p>Telegram · регіональні попередження про загрозу БпЛА.</p></li>
-        <li><strong>Загальноукраїнський потік</strong><p>Поточні цивільні тривоги по областях і районах, де доступні дані.</p></li>
-      </ul>
-      <a className="dialog-link" href={officialMap} target="_blank" rel="noreferrer">Офіційна мапа повітряних тривог</a>
-    </dialog>
     <dialog ref={messages} className="panel message-dialog" aria-labelledby="messages-title">
       <div className="dialog-title">
         <h2 id="messages-title"><MessageSquareText size={21} aria-hidden="true" /> Повідомлення</h2>

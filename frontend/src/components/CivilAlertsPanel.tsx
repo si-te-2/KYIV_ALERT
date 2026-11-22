@@ -6,6 +6,12 @@ const dateFormat = new Intl.DateTimeFormat('uk-UA', {
   timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short',
 });
 
+const notificationMessages: Record<string, string> = {
+  off: 'Сповіщення вимкнено в налаштуваннях.',
+  denied: 'Браузер заблокував сповіщення.',
+  unsupported: 'Браузер не підтримує сповіщення на цьому пристрої.',
+};
+
 export function CivilAlertsPanel({ feed, location, notifications, enableNotifications }: {
   feed: Feed;
   location: Location;
@@ -30,11 +36,7 @@ export function CivilAlertsPanel({ feed, location, notifications, enableNotifica
         <button className="secondary-button" type="button" onClick={enableNotifications}>
           <Bell size={16} aria-hidden="true" /> Увімкнути сповіщення
         </button>}
-      <p>{notifications === 'off' ? 'Сповіщення вимкнено в налаштуваннях.' :
-        notifications === 'granted' ? 'Сповіщення увімкнено, поки сайт відкрито.' :
-        notifications === 'denied' ? 'Браузер заблокував сповіщення.' :
-        notifications === 'unsupported' ? 'Браузер не підтримує сповіщення на цьому пристрої.' :
-        'Сповіщення працюють, поки сайт відкрито.'}</p>
+      {notificationMessages[notifications] && <p>{notificationMessages[notifications]}</p>}
     </div>
   </section>;
 }
