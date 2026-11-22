@@ -18,6 +18,16 @@ builder.Services.AddHttpClient("regional-alerts", client => client.Timeout = Tim
 builder.Services.AddSingleton<RegionalAlerts>();
 builder.Services.AddHostedService(services => services.GetRequiredService<RegionalAlerts>());
 builder.Services.AddProblemDetails();
+builder.Services.AddCors(options =>
+{
+    var publicOrigin = builder.Configuration["PublicApi:AllowedOrigin"];
+    if (string.IsNullOrEmpty(publicOrigin)) return;
+    if (!Uri.TryCreate(publicOrigin, UriKind.Absolute, out var origin) ||
+        origin.Scheme != "https" || origin.UserInfo.Length != 0 ||
+        origin.GetLeftPart(UriPartial.Authority) != publicOrigin)
+        throw new InvalidOperationException("PublicApi:AllowedOrigin must be an HTTPS origin without a path.");
+    options.AddDefaultPolicy(policy => policy.WithOrigins(publicOrigin).WithMethods("GET"));
+});
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ISystemSnapshotProvider, DemoSnapshotProvider>();
 
@@ -28,6 +38,7 @@ if (!app.Configuration.GetValue("DemoMode", true))
 }
 
 app.UseExceptionHandler();
+app.UseCors();
 app.Use(async (context, next) =>
 {
     context.Response.Headers.CacheControl = "no-store";
@@ -38,6 +49,7 @@ app.Use(async (context, next) =>
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", demoMode = true }));
+if (!app.Configuration.GetValue("PublicApi:ReadOnly", false))
 app.MapGet("/api/status", (ISystemSnapshotProvider provider) => {
     var status = provider.GetSnapshot();
     return status with

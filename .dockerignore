@@ -1,0 +1,14 @@
+.git
+**/bin
+**/obj
+**/node_modules
+**/wwwroot
+frontend
+.env*
+**/*.session*
+**/*.key
+**/*.pem
+**/*.pfx
+**/*.p12
+**/*.log
+**/*secrets*

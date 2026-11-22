@@ -66,9 +66,8 @@ public sealed class CivilAlertsMonitor(
             apiHash is null || apiHash.Length != 32 || !apiHash.All(Uri.IsHexDigit))
             throw new InvalidOperationException("Configure Telegram application credentials.");
 
-        var directory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KyivAlert", "Telegram");
-        var sessionPath = Path.Combine(directory, "account.session");
+        var sessionPath = TelegramSessionStorage.Prepare(configuration);
+        var directory = Path.GetDirectoryName(sessionPath)!;
         if (!File.Exists(sessionPath))
             throw new InvalidOperationException("Sign in with the local Telegram command first.");
 

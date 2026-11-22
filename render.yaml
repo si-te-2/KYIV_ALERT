@@ -1,0 +1,24 @@
+# Starts without Telegram credentials. Enable only after approving private session transfer.
+services:
+  - type: web
+    name: kyiv-alert-api
+    runtime: docker
+    plan: free
+    numInstances: 1
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: AllowedHosts
+        value: '*.onrender.com;localhost;127.0.0.1'
+      - key: PublicApi__AllowedOrigin
+        value: https://si-te-2.github.io
+      - key: PublicApi__ReadOnly
+        value: 'true'
+      - key: CivilAlerts__PublicFeed
+        value: 'true'
+      - key: CivilAlerts__Enabled
+        value: 'false'
+      - key: CivilAlerts__MonitoringChannels
+        value: kyiv_nebo,ppo_kiev,tlknewsua,nebo_raketa,smolii_ukraine,StrategicaviationT,ukraine_pyxx,kpszsu,war_monitor
+      - key: Telegram__SessionDirectory
+        value: /tmp/kyiv-alert-telegram

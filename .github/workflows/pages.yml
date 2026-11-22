@@ -34,6 +34,7 @@ jobs:
         working-directory: frontend
         env:
           VITE_STATIC_SITE: 'true'
+          VITE_PUBLIC_API_ORIGIN: ${{ vars.PUBLIC_API_ORIGIN }}
       - uses: actions/upload-pages-artifact@v4
         with:
           path: frontend/dist

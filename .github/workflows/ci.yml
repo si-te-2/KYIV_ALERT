@@ -29,6 +29,15 @@ jobs:
         working-directory: frontend
       - run: dotnet build backend/KyivAlert.Api/KyivAlert.Api.csproj --configuration Release
       - run: dotnet test backend/KyivAlert.Tests/KyivAlert.Tests.csproj --configuration Release
+      - name: Verify public API Docker image
+        run: |
+          docker build -t kyiv-alert-api .
+          docker run -d --name kyiv-alert-api -p 5087:8080 -e AllowedHosts=localhost -e PublicApi__ReadOnly=true -e PublicApi__AllowedOrigin=https://si-te-2.github.io kyiv-alert-api
+          trap 'docker logs kyiv-alert-api; docker rm -f kyiv-alert-api' EXIT
+          curl --fail --retry 20 --retry-connrefused --retry-delay 1 http://localhost:5087/api/health
+          curl --fail -H 'Origin: https://si-te-2.github.io' -D "$RUNNER_TEMP/cors-headers" http://localhost:5087/api/drone-warnings
+          grep -i '^Access-Control-Allow-Origin: https://si-te-2.github.io' "$RUNNER_TEMP/cors-headers"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5087/api/status)" = 404
       - name: Verify Telegram setup configuration
         shell: bash
         env:

@@ -1,5 +1,5 @@
 import { usePollingFeed } from './useCivilAlerts';
-import { staticSite } from '../services/runtime';
+import { droneApiUrl } from '../services/runtime';
 
 export type Credibility = 'CONFIRMED' | 'UNVERIFIED' | 'OUTDATED' | 'CONNECTION LOST';
 
@@ -27,5 +27,5 @@ const onDroneFailure = (previous: DroneFeed): DroneFeed => ({
 });
 
 export function useDroneThreats() {
-  return usePollingFeed(staticSite ? null : '/api/drone-warnings', staticSite ? disabled : initial, onDroneFailure);
+  return usePollingFeed(droneApiUrl, droneApiUrl ? initial : disabled, onDroneFailure);
 }
