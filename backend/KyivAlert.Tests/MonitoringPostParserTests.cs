@@ -15,6 +15,14 @@ public sealed class MonitoringPostParserTests
     [InlineData("Дрони з боку Борисполя", "UA-32", "UAV")]
     [InlineData("Шахеди в районі Вишгорода", "UA-32", "SHAHED")]
     [InlineData("Шахеди на Київ https://t.me/ukraine_pyxx/12 #київ", "UA-30", "SHAHED")]
+    [InlineData("Загроза Shahed на Одещині", "UA-51", "SHAHED")]
+    [InlineData("Герані на Сумщині", "UA-59", "SHAHED")]
+    [InlineData("Шахеди курсом на Харківщину", "UA-63", "SHAHED")]
+    [InlineData("Шахеди курсом на Харківщину\n@kyiv_nebo", "UA-63", "SHAHED")]
+    [InlineData("Шахеди на Київський район Харкова", "UA-63", "SHAHED")]
+    [InlineData("БпЛА на Херсонщині", "UA-65", "UAV")]
+    [InlineData("Загроза БпЛА у Дніпропетровській області", "UA-12", "UAV")]
+    [InlineData("Shahed на Чернігівщині", "UA-74", "SHAHED")]
     public void ReadsRegionLevelSignals(string text, string region, string kind)
     {
         var signal = Assert.Single(MonitoringPostParser.Parse("kyiv_nebo", 10, Now, text));
@@ -33,9 +41,8 @@ public sealed class MonitoringPostParserTests
     }
 
     [Theory]
-    [InlineData("Шахеди курсом на Харківщину")]
-    [InlineData("Шахеди курсом на Харківщину\n@kyiv_nebo")]
-    [InlineData("Шахеди на Київський район Харкова")]
+    [InlineData("Немає загрози БпЛА на Одещині")]
+    [InlineData("https://t.me/war_monitor/10 #Сумщина БпЛА")]
     [InlineData("БпЛА над Києвом, працює ППО")]
     [InlineData("Приліт шахеда у Київській області")]
     [InlineData("Загроза БпЛА у Києві минула, відбій")]
@@ -48,6 +55,15 @@ public sealed class MonitoringPostParserTests
     [InlineData("")]
     public void DropsAmbiguousSensitiveAndNegatedPosts(string text) =>
         Assert.Empty(MonitoringPostParser.Parse("kyiv_nebo", 10, Now, text));
+
+    [Fact]
+    public void MultipleRegionsAreIndependentWarningsFromOnePost()
+    {
+        var signals = MonitoringPostParser.Parse("war_monitor", 12, Now,
+            "Загроза Shahed на Одещині, Миколаївщині та Полтавщині.");
+        Assert.Equal(new[] { "UA-48", "UA-51", "UA-53" }, signals.Select(signal => signal.RegionId));
+        Assert.All(signals, signal => Assert.Equal("https://t.me/war_monitor/12", signal.SourceUrl));
+    }
 
     [Fact]
     public void DropsLongDigestsAndInvalidInput()
