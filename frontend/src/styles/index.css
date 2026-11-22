@@ -376,19 +376,28 @@ select { width: 100%; border: 1px solid #51466b; border-radius: 9px; background:
   background: #4c2d22; color: #ffd0a0; box-shadow: 0 0 14px #f7a36d65;
   transition: background var(--fast), box-shadow var(--fast);
 }
-.drone-marker.shahed { border-color: #ff8295; background: #61253a; color: #ffb7c7; box-shadow: 0 0 15px #f453736f; }
-/* Unofficial monitoring signal: dashed outline and a "?" badge, no glow. */
+.drone-marker.shahed {
+  --marker-glow: #ff684b;
+  border-color: #ffc0a745; border-radius: 50%; background: #321d2670;
+  color: #fff; box-shadow: 0 0 12px #ff684b29;
+}
+.drone-marker.shahed::before {
+  content: ""; position: absolute; inset: -20px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--marker-glow) 28%, transparent), transparent 68%);
+}
+/* The question badge and dashed border identify an unverified regional warning. */
 .drone-marker.unverified { border-style: dashed; opacity: .88; box-shadow: none; }
+.drone-marker.shahed.unverified { --marker-glow: #ffba69; border-color: #ffcf9180; background: #37291f65; }
 .drone-marker.unverified::after {
   content: "?"; position: absolute; top: -7px; right: -7px; display: grid; place-items: center;
   width: 15px; height: 15px; border-radius: 50%; background: #f6e4ff; color: #19182b;
   font-size: .7rem; font-weight: 800; line-height: 1;
 }
 .shahed-icon {
-  display: inline-block; width: 1.1em; height: 1.1em; flex-shrink: 0; background: currentColor;
-  clip-path: polygon(50% 4%, 94% 87%, 67% 80%, 57% 74%, 57% 96%, 43% 96%, 43% 74%, 33% 80%, 6% 87%);
+  display: inline-block; width: 1.35em; height: 1.1em; flex-shrink: 0; background: currentColor;
+  clip-path: polygon(98% 50%, 67% 43%, 24% 4%, 10% 4%, 32% 43%, 7% 39%, 2% 31%, 0% 31%, 6% 50%, 0% 69%, 2% 69%, 7% 61%, 32% 57%, 10% 96%, 24% 96%, 67% 57%);
 }
-.drone-marker .shahed-icon { font-size: 1.18rem; }
+.drone-marker .shahed-icon { position: relative; font-size: 1.25rem; }
 .shahed-legend .shahed-icon { color: #ff98ae; }
 [data-theme="light"] .shahed-legend .shahed-icon { color: #86194c; }
 .drone-marker:hover, .drone-marker[aria-pressed="true"] { box-shadow: 0 0 0 2px #f6e4ff, 0 0 16px #f6e4ff55; }
@@ -434,3 +443,4 @@ select { width: 100%; border: 1px solid #51466b; border-radius: 9px; background:
   .monitoring-header-row nav :is(a, button) { padding-inline: 6px; font-size: .78rem; }
   .brand small { font-size: .51rem; }
 }
+
