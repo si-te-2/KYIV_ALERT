@@ -292,7 +292,7 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
           className={`drone-marker ${entry.kind.toLowerCase()}${entry.status === 'UNVERIFIED' ? ' unverified' : ''}`} style={{ left: x, top: y }}
           aria-label={`Регіональна загроза ${entry.kind === 'SHAHED' ? 'Shahed' : 'БпЛА'}${entry.status === 'UNVERIFIED' ? ' (неперевірено)' : ''}: ${name}`}
           aria-pressed={selectedWarning === entry.regionId} onClick={() => selectWarning(entry)}>
-          {entry.kind === 'SHAHED' ? <ShahedIcon /> : <Drone size={17} aria-hidden="true" />}
+          <ShahedIcon />
         </button>)}
         {warning && <article className="map-warning-card" aria-label="Деталі регіонального попередження">
           <button type="button" className="drawer-close" aria-label="Закрити картку БпЛА"
