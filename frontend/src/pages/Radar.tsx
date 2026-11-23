@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Crosshair, Layers, Minus, Plus, PanelRightOpen, Radio, RotateCcw, RotateCw, Scan, Waves, X, Drone } from 'lucide-react';
 import { AlertFeedDrawer } from '../components/AlertFeedDrawer';
 import { DroneWarnings, ShahedIcon, WarningDetails } from '../components/DroneWarnings';
 import { alertLabels, isActive, statusLabel, type AlertLevel, type Feed } from '../hooks/useCivilAlerts';
 import type { DroneFeed, DroneWarning } from '../hooks/useDroneThreats';
+import { regionalMarkerZoomLimit, satelliteMaxZoom, satelliteMinZoom, useSatelliteMap } from '../hooks/useSatelliteMap';
 import { mapAreas, mapDistricts, mapRegions, type Location } from '../services/locations';
 import { countryView, getScale, keepPoint, toMap, toScreen, type Point } from '../services/mapCamera';
 import { separateRegionMarkers } from '../services/regionMarkers';
@@ -50,6 +51,7 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
   const canvas = useRef<HTMLCanvasElement>(null);
   const mapPanel = useRef<HTMLElement>(null);
   const mapSurface = useRef<HTMLDivElement>(null);
+  const satelliteSurface = useRef<HTMLDivElement>(null);
   const pointers = useRef(new Map<number, Point>());
   const dragged = useRef(false);
   const lastCamera = useRef(camera);
@@ -57,6 +59,25 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
   const warning = droneFeed.warnings.find(entry => entry.regionId === selectedWarning);
   const activeArea = findArea(selected);
   const levels = useMemo(() => new Map(feed.alerts.map(alert => [alert.regionId, alert])), [feed.alerts]);
+
+  const satelliteStyle = useCallback<google.maps.Data.StylingFunction>(feature => {
+    const id = String(feature.getId());
+    const district = !id.includes('-');
+    const level = showCivil ? levels.get(id)?.level : undefined;
+    const active = (level === 'active' || level === 'warning' || level === 'partial')
+      && (district || !districts || level !== 'partial');
+    const paint = active ? colors[level] : colors.neutral;
+    return {
+      visible: !district || districts,
+      fillColor: paint.fill,
+      fillOpacity: active ? .28 : 0,
+      strokeColor: selected === id ? '#e5d7ff' : active ? paint.border : '#b0bade',
+      strokeOpacity: selected === id || active ? .95 : district ? .36 : .75,
+      strokeWeight: selected === id ? 2 : district ? .85 : 1.4,
+      zIndex: district ? (selected === id ? 3 : 2) : selected === id ? 1 : 0,
+    };
+  }, [districts, levels, selected, showCivil]);
+  const satellite = useSatelliteMap(satelliteSurface, satelliteStyle, selectRegion);
 
   const selectedAlert = levels.get(selected);
   const selectedLevel = selectedAlert?.level;
@@ -67,7 +88,7 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
   }
 
   useEffect(() => {
-    const element = canvas.current;
+    const element = mapSurface.current;
     if (!element) return;
     const resize = new ResizeObserver(([entry]) => {
       setSize({ width: entry.contentRect.width, height: entry.contentRect.height });
@@ -78,7 +99,7 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
 
   useEffect(() => {
     const element = canvas.current;
-    if (!element) return;
+    if (!element || satellite.active) return;
     function wheel(event: WheelEvent) {
       if (event.target instanceof Element && event.target.closest('.map-warning-card')) return;
       const bounds = element!.getBoundingClientRect();
@@ -92,12 +113,12 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
     const surface = mapSurface.current;
     surface?.addEventListener('wheel', wheel, { passive: false });
     return () => surface?.removeEventListener('wheel', wheel);
-  }, []);
+  }, [satellite.active]);
 
   useLayoutEffect(() => {
     const element = canvas.current;
     const context = element?.getContext('2d');
-    if (!element || !context || !size.width || !size.height) return;
+    if (!element || !context || !size.width || !size.height || satellite.active) return;
     lastCamera.current = camera;
     const density = Math.min(2, window.devicePixelRatio || 1);
     const width = Math.round(size.width * density);
@@ -163,12 +184,13 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
       context.fillStyle = isActive(mapLevel(area.id)) ? '#ffe0ee' : '#c9d3f1';
       context.fillText(area.label, label.x, label.y);
     }
-  }, [camera, districts, levels, selected, shapes, showCivil, size]);
+  }, [camera, districts, levels, satellite.active, selected, shapes, showCivil, size]);
 
   function focusArea(id: string) {
     const area = findArea(id);
     if (!area) return;
     selectRegion(id);
+    satellite.focus(id);
     if (!size.width) return;
     const [left, top, right, bottom] = area.bounds;
     const zoom = Math.min(6, Math.min(size.width / (right - left + 24), size.height / (bottom - top + 24)) / getScale(size, 1));
@@ -240,20 +262,40 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
     if (hit) selectRegion(hit.id);
   }
 
+  function zoomBy(delta: number) {
+    if (satellite.active) satellite.zoomBy(delta);
+    else setCamera(current => ({ ...current, zoom: Math.min(6, Math.max(1, current.zoom * 1.25 ** delta)) }));
+  }
+
+  function rotateBy(direction: number) {
+    if (satellite.active) satellite.rotateBy(direction * 15);
+    else setCamera(current => ({ ...current, angle: current.angle + direction * turn }));
+  }
+
+  function resetView() {
+    satellite.focus();
+    setCamera(countryView);
+  }
+
+  function markerPoint(area: (typeof mapAreas)[number]) {
+    return satellite.active ? satellite.points.get(area.id) : toScreen(camera, size, area);
+  }
+
   const mapMarkers = size.width ? (districts ? [...mapDistricts, ...mapRegions] : mapRegions).flatMap(area => {
     const level = mapLevel(area.id);
     if (!isActive(level) || levels.get(area.id)?.inherited || (districts && level === 'partial' && mapRegions.some(region => region.id === area.id))) return [];
-    const point = toScreen(camera, size, area);
-    return point.x > 8 && point.y > 8 && point.x < size.width - 8 && point.y < size.height - 8
+    const point = markerPoint(area);
+    return point && point.x > 8 && point.y > 8 && point.x < size.width - 8 && point.y < size.height - 8
       ? [{ id: area.id, name: area.name, level, left: point.x, top: point.y }] : [];
   }) : [];
 
   const warningMarkers = size.width && showDrone && droneFeed.status === 'ready'
+    && (!satellite.active || satellite.zoom < regionalMarkerZoomLimit)
     ? separateRegionMarkers(droneFeed.warnings.flatMap(entry => {
       const area = mapRegions.find(area => area.id === entry.regionId);
       if (!area || (entry.status !== 'CONFIRMED' && entry.status !== 'UNVERIFIED')) return [];
-      const point = toScreen(camera, size, area);
-      return point.x > 15 && point.y > 15 && point.x < size.width - 15 && point.y < size.height - 15
+      const point = markerPoint(area);
+      return point && point.x > 15 && point.y > 15 && point.x < size.width - 15 && point.y < size.height - 15
         ? [{ entry, name: area.name, ...point }] : [];
     }).sort((a, b) => a.entry.regionId.localeCompare(b.entry.regionId)), size) : [];
 
@@ -263,12 +305,12 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
       <div className="map-heading">
         <div><p className="eyebrow"><Waves size={16} aria-hidden="true" /> Огляд</p><h2>Карта України</h2></div>
         <div className="map-controls">
-          <button aria-label="Зменшити" title="Зменшити" disabled={camera.zoom <= 1} onClick={() => setCamera(current => ({ ...current, zoom: Math.max(1, current.zoom / 1.25) }))}><Minus size={17} /></button>
-          <button aria-label="Збільшити" title="Збільшити" disabled={camera.zoom >= 6} onClick={() => setCamera(current => ({ ...current, zoom: Math.min(6, current.zoom * 1.25) }))}><Plus size={17} /></button>
-          <button aria-label="Повернути ліворуч" title="Повернути ліворуч" onClick={() => setCamera(current => ({ ...current, angle: current.angle - turn }))}><RotateCcw size={17} /></button>
-          <button aria-label="Повернути праворуч" title="Повернути праворуч" onClick={() => setCamera(current => ({ ...current, angle: current.angle + turn }))}><RotateCw size={17} /></button>
+          <button aria-label="Зменшити" title="Зменшити" disabled={satellite.active ? satellite.zoom <= satelliteMinZoom : camera.zoom <= 1} onClick={() => zoomBy(-1)}><Minus size={17} /></button>
+          <button aria-label="Збільшити" title="Збільшити" disabled={satellite.active ? satellite.zoom >= satelliteMaxZoom : camera.zoom >= 6} onClick={() => zoomBy(1)}><Plus size={17} /></button>
+          <button aria-label="Повернути ліворуч" title="Повернути ліворуч" disabled={satellite.active && !satellite.canRotate} onClick={() => rotateBy(-1)}><RotateCcw size={17} /></button>
+          <button aria-label="Повернути праворуч" title="Повернути праворуч" disabled={satellite.active && !satellite.canRotate} onClick={() => rotateBy(1)}><RotateCw size={17} /></button>
           <button aria-label="Мій регіон" title="Мій регіон" onClick={() => focusArea(location.regionId)}><Crosshair size={17} /></button>
-          <button aria-label="Скинути вигляд" title="Скинути вигляд" onClick={() => setCamera(countryView)}><Scan size={17} /></button>
+          <button aria-label="Скинути вигляд" title="Скинути вигляд" onClick={resetView}><Scan size={17} /></button>
         </div>
       </div>
       <div className="map-shortcuts">
@@ -281,8 +323,10 @@ export function Radar({ feed, droneFeed, location, feedOpen, feedView, setFeedVi
         <button type="button" onClick={() => focusArea('UA-51')}>Одещина</button>
         <button type="button" onClick={() => focusArea('UA-65')}>Херсонщина</button>
       </div>
-      <div className="map-surface" ref={mapSurface}>
-        <canvas ref={canvas} onPointerDown={startDrag} onPointerMove={drag}
+      {satellite.failed && <p className="map-status" role="status">Супутникова карта недоступна. Показано оглядову карту тривог.</p>}
+      <div className="map-surface" ref={mapSurface} data-satellite={satellite.active}>
+        <div className="google-map" ref={satelliteSurface} aria-hidden={!satellite.active} />
+        <canvas ref={canvas} hidden={satellite.active} onPointerDown={startDrag} onPointerMove={drag}
           onPointerCancel={finishDrag} onPointerUp={finishDrag} onLostPointerCapture={finishDrag} onKeyDown={panFromKeyboard}
           tabIndex={0} aria-label="Інтерактивна карта" />
         {mapMarkers.map(marker => <button key={marker.id} type="button" className={`map-pulse ${marker.level}`}
