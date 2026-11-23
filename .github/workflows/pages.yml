@@ -35,6 +35,7 @@ jobs:
         env:
           VITE_STATIC_SITE: 'true'
           VITE_PUBLIC_API_ORIGIN: ${{ vars.PUBLIC_API_ORIGIN }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ vars.GOOGLE_MAPS_API_KEY }}
       - uses: actions/upload-pages-artifact@v4
         with:
           path: frontend/dist
